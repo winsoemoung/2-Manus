@@ -1,0 +1,8 @@
+{
+  "name": "2-Manus AI 787-AI-update OfflinePOS",
+  "description": "Imported from GitHub: winsoemoung/OfflinePOS",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
