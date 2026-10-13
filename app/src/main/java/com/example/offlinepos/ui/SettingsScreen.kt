@@ -59,6 +59,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -81,6 +82,23 @@ fun SettingsScreen(
     var pinInput by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf<String?>(null) }
     var backupStatusMessage by remember { mutableStateOf<String?>(null) }
+
+    val googleAccount by viewModel.googleAccount.collectAsState()
+    val lastGoogleBackupTime by viewModel.lastGoogleBackupTime.collectAsState()
+    var googleEmailInput by remember(googleAccount) { mutableStateOf(googleAccount ?: "WINSOEMOUNG@gmail.com") }
+
+    var showChangeOwnerPinDialog by remember { mutableStateOf(false) }
+    var showChangeManagerPinDialog by remember { mutableStateOf(false) }
+
+    var currentOwnerPinInput by remember { mutableStateOf("") }
+    var newOwnerPinInput by remember { mutableStateOf("") }
+    var confirmOwnerPinInput by remember { mutableStateOf("") }
+    var ownerPinError by remember { mutableStateOf<String?>(null) }
+
+    var currentManagerPinInput by remember { mutableStateOf("") }
+    var newManagerPinInput by remember { mutableStateOf("") }
+    var confirmManagerPinInput by remember { mutableStateOf("") }
+    var managerPinError by remember { mutableStateOf<String?>(null) }
 
     // Store profile editing states
     var storeName by remember(storeProfile) { mutableStateOf(storeProfile.storeName) }
@@ -528,6 +546,92 @@ fun SettingsScreen(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text("👤 Google Account ဖြင့် အရန်သိမ်းဆည်းရန် Log In / Sync:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    if (googleAccount != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text("✅ ချိတ်ဆက်ထားသော Google Account:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(googleAccount!!, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                                if (lastGoogleBackupTime > 0) {
+                                    val formattedTime = SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault()).format(Date(lastGoogleBackupTime))
+                                    Text("နောက်ဆုံး Backup လုပ်ခဲ့သည့်အချိန်: $formattedTime", fontSize = 11.sp, color = Color(0xFF15803D))
+                                } else {
+                                    Text("Google Drive သို့ Backup မပြုလုပ်ရသေးပါ", fontSize = 11.sp, color = Color.Gray)
+                                }
+                            }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { viewModel.disconnectGoogleAccount() },
+                                modifier = Modifier.weight(1f).testTag("disconnect_google_button"),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("အကောင့်ဖြုတ်မည်", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+                            }
+                            Button(
+                                onClick = {
+                                    try {
+                                        val exported = viewModel.exportDatabaseFile()
+                                        if (exported != null) {
+                                            viewModel.recordGoogleBackupSuccess()
+                                            val uri: Uri = try {
+                                                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", exported)
+                                            } catch (e: Exception) {
+                                                Uri.fromFile(exported)
+                                            }
+                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                type = "application/octet-stream"
+                                                putExtra(Intent.EXTRA_STREAM, uri)
+                                                putExtra(Intent.EXTRA_SUBJECT, "787 POS ဒေတာ Backup (${googleAccount})")
+                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            context.startActivity(Intent.createChooser(shareIntent, "Google Drive သို့ တင်ရန်"))
+                                            backupStatusMessage = "Google Drive သို့ Backup တင်ပို့ပြီးပါပြီ"
+                                        }
+                                    } catch (e: Exception) {
+                                        backupStatusMessage = "ချို့ယွင်းချက်ဖြစ်ပေါ်ပါသည်: ${e.localizedMessage}"
+                                    }
+                                },
+                                modifier = Modifier.weight(1.3f).testTag("backup_to_drive_button"),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("☁️ Google Drive သို့ Backup", fontSize = 11.sp)
+                            }
+                        }
+                    } else {
+                        OutlinedTextField(
+                            value = googleEmailInput,
+                            onValueChange = { googleEmailInput = it },
+                            label = { Text("Google အကောင့် (Gmail)") },
+                            placeholder = { Text("WINSOEMOUNG@gmail.com") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().testTag("google_account_input"),
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Button(
+                            onClick = {
+                                viewModel.connectGoogleAccount(googleEmailInput)
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("connect_google_account_button"),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("🔗 Google Account ဖြင့် Log in / ချိတ်ဆက်မည်")
+                        }
+                    }
+
                     backupStatusMessage?.let {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
@@ -632,8 +736,45 @@ fun SettingsScreen(
                             Text("PIN ဖြင့် ဖွင့်မည်", fontSize = 12.sp)
                         }
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("• ဆိုင်ရှင် PIN: 7870 (Full Access) | • မန်နေဂျာ PIN: 1234", fontSize = 11.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text("🔐 လုံခြုံရေး PIN နံပါတ်များ ပြောင်းလဲခြင်း (Change PINs):", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                currentOwnerPinInput = ""
+                                newOwnerPinInput = ""
+                                confirmOwnerPinInput = ""
+                                ownerPinError = null
+                                showChangeOwnerPinDialog = true
+                            },
+                            modifier = Modifier.weight(1f).testTag("change_owner_pin_button"),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("🔑 ဆိုင်ရှင် PIN ပြောင်း", fontSize = 11.5.sp)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                currentManagerPinInput = ""
+                                newManagerPinInput = ""
+                                confirmManagerPinInput = ""
+                                managerPinError = null
+                                showChangeManagerPinDialog = true
+                            },
+                            modifier = Modifier.weight(1f).testTag("change_manager_pin_button"),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("👔 မန်နေဂျာ PIN ပြောင်း", fontSize = 11.5.sp)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("• ဆိုင်ရှင် မူလ PIN: 7870 (Full Access) | • မန်နေဂျာ မူလ PIN: 1234", fontSize = 11.sp, color = Color.Gray)
                 }
             }
 
@@ -797,6 +938,180 @@ fun SettingsScreen(
                             modifier = Modifier.testTag("submit_manager_pin_button"),
                         ) {
                             Text("အတည်ပြုမည်")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Change Owner PIN Dialog
+    if (showChangeOwnerPinDialog) {
+        Dialog(onDismissRequest = { showChangeOwnerPinDialog = false }) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .testTag("change_owner_pin_dialog"),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("🔑 ဆိုင်ရှင် PIN နံပါတ် ပြောင်းလဲရန်", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("လက်ရှိ ဆိုင်ရှင် PIN နှင့် အသစ်ထားရှိမည့် PIN ကို ရိုက်ထည့်ပါ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = currentOwnerPinInput,
+                        onValueChange = { currentOwnerPinInput = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                        label = { Text("လက်ရှိ ဆိုင်ရှင် PIN (မူလ: 7870)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("current_owner_pin_input"),
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = newOwnerPinInput,
+                        onValueChange = { newOwnerPinInput = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                        label = { Text("PIN အသစ် (အနည်းဆုံး ၄ လုံး)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("new_owner_pin_input"),
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = confirmOwnerPinInput,
+                        onValueChange = { confirmOwnerPinInput = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                        label = { Text("PIN အသစ်ကို ထပ်မံအတည်ပြုပါ") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("confirm_owner_pin_input"),
+                    )
+
+                    ownerPinError?.let {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { showChangeOwnerPinDialog = false }) { Text("မလုပ်တော့ပါ") }
+                        Button(
+                            onClick = {
+                                if (newOwnerPinInput.length < 4) {
+                                    ownerPinError = "PIN အသစ်သည် အနည်းဆုံး ၄ လုံး ရှိရပါမည်"
+                                    return@Button
+                                }
+                                if (newOwnerPinInput != confirmOwnerPinInput) {
+                                    ownerPinError = "PIN အသစ်နှစ်ခု ကိုက်ညီမှုမရှိပါ"
+                                    return@Button
+                                }
+                                if (viewModel.changeOwnerPin(currentOwnerPinInput, newOwnerPinInput)) {
+                                    showChangeOwnerPinDialog = false
+                                } else {
+                                    ownerPinError = "လက်ရှိ ဆိုင်ရှင် PIN မှားယွင်းနေပါသည်"
+                                }
+                            },
+                            modifier = Modifier.testTag("submit_change_owner_pin_button"),
+                        ) {
+                            Text("ပြောင်းလဲသိမ်းဆည်းမည်")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Change Manager PIN Dialog
+    if (showChangeManagerPinDialog) {
+        Dialog(onDismissRequest = { showChangeManagerPinDialog = false }) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .testTag("change_manager_pin_dialog"),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("👔 မန်နေဂျာ PIN နံပါတ် ပြောင်းလဲရန်", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("လက်ရှိ မန်နေဂျာ/ဆိုင်ရှင် PIN နှင့် PIN အသစ်ကို ရိုက်ထည့်ပါ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = currentManagerPinInput,
+                        onValueChange = { currentManagerPinInput = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                        label = { Text("လက်ရှိ မန်နေဂျာ သို့မဟုတ် ဆိုင်ရှင် PIN") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("current_manager_pin_input"),
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = newManagerPinInput,
+                        onValueChange = { newManagerPinInput = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                        label = { Text("PIN အသစ် (အနည်းဆုံး ၄ လုံး)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("new_manager_pin_input"),
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = confirmManagerPinInput,
+                        onValueChange = { confirmManagerPinInput = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                        label = { Text("PIN အသစ်ကို ထပ်မံအတည်ပြုပါ") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("confirm_manager_pin_input"),
+                    )
+
+                    managerPinError?.let {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { showChangeManagerPinDialog = false }) { Text("မလုပ်တော့ပါ") }
+                        Button(
+                            onClick = {
+                                if (newManagerPinInput.length < 4) {
+                                    managerPinError = "PIN အသစ်သည် အနည်းဆုံး ၄ လုံး ရှိရပါမည်"
+                                    return@Button
+                                }
+                                if (newManagerPinInput != confirmManagerPinInput) {
+                                    managerPinError = "PIN အသစ်နှစ်ခု ကိုက်ညီမှုမရှိပါ"
+                                    return@Button
+                                }
+                                if (viewModel.changeManagerPin(currentManagerPinInput, newManagerPinInput)) {
+                                    showChangeManagerPinDialog = false
+                                } else {
+                                    managerPinError = "လက်ရှိ PIN မှားယွင်းနေပါသည်"
+                                }
+                            },
+                            modifier = Modifier.testTag("submit_change_manager_pin_button"),
+                        ) {
+                            Text("ပြောင်းလဲသိမ်းဆည်းမည်")
                         }
                     }
                 }

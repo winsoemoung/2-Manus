@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -61,8 +62,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.offlinepos.data.local.ProductEntity
 import com.example.offlinepos.data.local.PurchaseEntity
 import com.example.offlinepos.data.local.SaleEntity
+import com.example.offlinepos.data.local.SaleItemEntity
 import com.example.offlinepos.data.local.ShiftReportEntity
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -82,6 +85,16 @@ enum class AnalyticsTab(val label: String) {
     PROFIT_LOSS("အမြတ်/အရှုံး"),
     PURCHASES("ပစ္စည်းအဝင် (COGS)"),
     SHIFTS("နေ့ချုပ်များ (Z-Reports)"),
+    REORDER_REPORTS("📊 မှာယူရန်/Reorder"),
+}
+
+enum class PeriodicReportType(val label: String, val description: String) {
+    WEEKLY_SUNDAY("အပတ်စဉ် Sunday Reorder", "တနင်္ဂနွေနေ့တိုင်း ထုတ်ပေးမည့် အပတ်စဉ် ရောင်းအားကောင်းပစ္စည်းများနှင့် ပြန်လည်မှာယူရန်စာရင်း"),
+    MONTHLY_FIRST("လစဉ် ၁ ရက်နေ့ စာရင်း", "လဆန်း ၁ ရက်နေ့တိုင်း ထုတ်ပေးမည့် လစဉ် ရောင်းအားကောင်းပစ္စည်းများနှင့် ပိုမှာသင့်သည့်စာရင်း"),
+    QUARTERLY_3M("၃ လ တစ်ခါ (Quarterly)", "၃ လအတွင်း အရောင်းအသွက်ဆုံး ပစ္စည်းများနှင့် သုံးလပတ် ဝယ်ယူသင့်သော ပစ္စည်းစာရင်း"),
+    HALF_YEAR_6M("၆ လ တစ်ခါ (6 Months)", "၆ လအတွင်း အရောင်းအကောင်းဆုံး ပစ္စည်းများနှင့် ခြောက်လပတ် ဝယ်ယူသင့်သော ပစ္စည်းစာရင်း"),
+    ANNUAL_12M("၁၂ လ တစ်ခါ (Annual)", "နှစ်စဉ် ၁၂ လအတွင်း မည်သည့်လတွင် ဘာပစ္စည်းများ ရောင်းကောင်းခဲ့သည်နှင့် နှစ်ချုပ် ဝယ်ယူရန်စာရင်း"),
+    DAILY("ရက်စဉ် (Daily)", "နေ့စဉ် ရောင်းအားနှင့် လက်ကျန်ဖြည့်တင်းရန် အစီရင်ခံစာ"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,6 +105,7 @@ fun SalesHistoryScreen(
     val context = LocalContext.current
     val allSales by viewModel.salesHistory.collectAsState()
     val allProducts by viewModel.allProducts.collectAsState()
+    val allSaleItems by viewModel.allSaleItems.collectAsState()
     val storeProfile by viewModel.storeProfile.collectAsState()
     val purchases by viewModel.purchases.collectAsState()
     val shifts by viewModel.shifts.collectAsState()
@@ -205,22 +219,23 @@ fun SalesHistoryScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Calendar / Period Filter Pills
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(DateFilterMode.values()) { mode ->
-                    FilterChip(
-                        selected = selectedFilterMode == mode,
-                        onClick = {
-                            selectedFilterMode = mode
-                            if (mode == DateFilterMode.CUSTOM) {
-                                showCustomRangeDialog = true
-                            }
-                        },
-                        label = { Text(mode.label, fontSize = 11.sp) },
-                    )
+            if (selectedTab != AnalyticsTab.REORDER_REPORTS) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(DateFilterMode.values()) { mode ->
+                        FilterChip(
+                            selected = selectedFilterMode == mode,
+                            onClick = {
+                                selectedFilterMode = mode
+                                if (mode == DateFilterMode.CUSTOM) {
+                                    showCustomRangeDialog = true
+                                }
+                            },
+                            label = { Text(mode.label, fontSize = 11.sp) },
+                        )
+                    }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
 
             when (selectedTab) {
                 AnalyticsTab.SALES -> {
@@ -462,6 +477,16 @@ fun SalesHistoryScreen(
                         }
                     }
                 }
+
+                AnalyticsTab.REORDER_REPORTS -> {
+                    ReorderAndPeriodicReportView(
+                        allSales = allSales,
+                        allSaleItems = allSaleItems,
+                        allProducts = allProducts,
+                        storeProfile = storeProfile,
+                        onOpenStockIn = { showStockInDialog = true },
+                    )
+                }
             }
         }
     }
@@ -618,6 +643,349 @@ private fun CustomDateRangeDialog(
                         }
                     ) {
                         Text("အတည်ပြုသည်")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ReorderAndPeriodicReportView(
+    allSales: List<SaleEntity>,
+    allSaleItems: List<SaleItemEntity>,
+    allProducts: List<ProductEntity>,
+    storeProfile: StoreProfile,
+    onOpenStockIn: () -> Unit,
+) {
+    var selectedPeriod by remember { mutableStateOf(PeriodicReportType.WEEKLY_SUNDAY) }
+    val context = LocalContext.current
+
+    // Calculate timestamp cutoff based on selected period
+    val now = System.currentTimeMillis()
+    val periodStartMs = remember(selectedPeriod, now) {
+        val cal = Calendar.getInstance().apply { timeInMillis = now }
+        when (selectedPeriod) {
+            PeriodicReportType.DAILY -> {
+                cal.apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+            }
+            PeriodicReportType.WEEKLY_SUNDAY -> {
+                now - (7L * 24 * 60 * 60 * 1000)
+            }
+            PeriodicReportType.MONTHLY_FIRST -> {
+                now - (30L * 24 * 60 * 60 * 1000)
+            }
+            PeriodicReportType.QUARTERLY_3M -> {
+                now - (90L * 24 * 60 * 60 * 1000)
+            }
+            PeriodicReportType.HALF_YEAR_6M -> {
+                now - (180L * 24 * 60 * 60 * 1000)
+            }
+            PeriodicReportType.ANNUAL_12M -> {
+                now - (365L * 24 * 60 * 60 * 1000)
+            }
+        }
+    }
+
+    // Map sales by ID to extract timestamps
+    val salesMap = remember(allSales) { allSales.associateBy { it.saleId } }
+
+    // Group sales items into the selected timeframe
+    val periodSaleItems = remember(allSaleItems, salesMap, periodStartMs) {
+        allSaleItems.filter { item ->
+            val sale = salesMap[item.saleId]
+            (sale?.createdAtEpochMs ?: 0L) >= periodStartMs
+        }
+    }
+
+    // Product sold quantities in this period
+    val productSoldQtyMap = remember(periodSaleItems) {
+        periodSaleItems.groupBy { it.productId }
+            .mapValues { (_, items) -> items.sumOf { it.quantity } }
+    }
+
+    data class MonthTopProduct(val productName: String, val totalQty: Long)
+    data class MonthSalesSummary(val monthLabel: String, val topProducts: List<MonthTopProduct>)
+
+    // Monthly Best Sellers breakdown (across all sales)
+    val monthlyBestSellers = remember(allSaleItems, salesMap) {
+        val monthFormat = SimpleDateFormat("yyyy-MM (MMMM)", Locale.getDefault())
+        val groupedByMonth = allSaleItems.groupBy { item ->
+            val sale = salesMap[item.saleId]
+            if (sale != null) monthFormat.format(Date(sale.createdAtEpochMs)) else "အထွေထွေ"
+        }
+        groupedByMonth.map { (monthStr, itemsInMonth) ->
+            val topList = itemsInMonth.groupBy { it.productNameSnapshot }
+                .map { (name, lines) -> MonthTopProduct(name, lines.sumOf { it.quantity }) }
+                .sortedByDescending { it.totalQty }
+                .take(4)
+            MonthSalesSummary(monthStr, topList)
+        }.sortedByDescending { it.monthLabel }
+    }
+
+    data class ReorderRecommendation(
+        val product: ProductEntity,
+        val soldInPeriod: Long,
+        val suggestedReorderQty: Long,
+        val urgency: String,
+        val estimatedCost: Long,
+    )
+
+    val recommendations = remember(allProducts, productSoldQtyMap, selectedPeriod) {
+        allProducts.map { prod ->
+            val sold = productSoldQtyMap[prod.productId] ?: 0L
+            val isLow = prod.stockQuantity <= prod.lowStockThreshold
+            val urgency = when {
+                prod.stockQuantity <= 0 -> "🔴 ပြတ်လပ်နေပါသည် (ချက်ချင်းမှာယူပါ)"
+                isLow -> "🔴 လက်ကျန်နည်းနေပါသည် (အရေးပေါ်မှာယူပါ)"
+                sold > prod.stockQuantity -> "🟡 ရောင်းအားသွက် (ကြိုတင်မှာယူပါ)"
+                sold > 0 -> "🟢 ရောင်းအားကောင်း (ပိုမှာသင့်သည်)"
+                else -> "⚪ ပုံမှန် လက်ကျန်"
+            }
+
+            val baseNeeded = when {
+                sold > 0 -> (sold * 1.3).toLong().coerceAtLeast(prod.lowStockThreshold * 2)
+                else -> prod.lowStockThreshold * 2
+            }
+            val suggested = (baseNeeded - prod.stockQuantity).coerceAtLeast(0L)
+            val rounded = if (suggested > 0) ((suggested + 9) / 10) * 10 else 0L
+
+            ReorderRecommendation(
+                product = prod,
+                soldInPeriod = sold,
+                suggestedReorderQty = if (rounded > 0) rounded else (if (isLow) prod.lowStockThreshold * 2 else 0L),
+                urgency = urgency,
+                estimatedCost = (if (rounded > 0) rounded else (if (isLow) prod.lowStockThreshold * 2 else 0L)) * prod.costPriceMinor
+            )
+        }.sortedWith(
+            compareByDescending<ReorderRecommendation> { it.suggestedReorderQty > 0 }
+                .thenByDescending { it.soldInPeriod }
+        )
+    }
+
+    val totalEstimatedBudget = recommendations.sumOf { it.estimatedCost }
+    val totalItemsToReorder = recommendations.count { it.suggestedReorderQty > 0 }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Period Selector Chips
+        item {
+            Text("အစီရင်ခံစာ ကာလ ရွေးချယ်ရန်:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(PeriodicReportType.values()) { pType ->
+                    FilterChip(
+                        selected = selectedPeriod == pType,
+                        onClick = { selectedPeriod = pType },
+                        label = { Text(pType.label, fontSize = 11.5.sp) }
+                    )
+                }
+            }
+        }
+
+        // Summary Card & Action Bar
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = "📋 ${selectedPeriod.label} သုံးသပ်ချက် & Reorder စာရင်း",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = selectedPeriod.description,
+                        fontSize = 11.5.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("မှာယူရန် လိုအပ်သော ပစ္စည်း:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text("$totalItemsToReorder မျိုး", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("ခန့်မှန်း အရင်းအနှီး ကုန်ကျစရိတ်:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text("%,d Ks".format(totalEstimatedBudget), fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val reportText = buildString {
+                                    appendLine("📊 **${storeProfile.storeName} - ${selectedPeriod.label} အစီရင်ခံစာ**")
+                                    appendLine("📅 ထုတ်ယူသည့်ရက်စွဲ: ${SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault()).format(Date())}")
+                                    appendLine("━━━━━━━━━━━━━━━━━━━━━━")
+                                    appendLine("⚠️ **ပိုမှာသင့်သည့် ပစ္စည်းများနှင့် Reorder စာရင်း:**")
+                                    recommendations.filter { it.suggestedReorderQty > 0 }.forEachIndexed { idx, rec ->
+                                        appendLine("${idx + 1}။ ${rec.product.name} (SKU: ${rec.product.sku})")
+                                        appendLine("   • လက်ရှိလက်ကျန်: ${rec.product.stockQuantity} ခု | ရောင်းအား: ${rec.soldInPeriod} ခု")
+                                        appendLine("   • ပိုမှာသင့်သည့်အရေအတွက်: ${rec.suggestedReorderQty} ခု (ခန့်မှန်း: %,d Ks)".format(rec.estimatedCost))
+                                    }
+                                    appendLine("━━━━━━━━━━━━━━━━━━━━━━")
+                                    appendLine("📈 စုစုပေါင်း မှာယူရန် ပစ္စည်း: $totalItemsToReorder မျိုး")
+                                    appendLine("💰 ခန့်မှန်း အရင်းငွေ: %,d Ks".format(totalEstimatedBudget))
+                                }
+
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, reportText)
+                                    putExtra(Intent.EXTRA_SUBJECT, "${selectedPeriod.label} Reorder Report")
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "အစီရင်ခံစာ မျှဝေရန်"))
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("📤 အစီရင်ခံစာ Share", fontSize = 11.5.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = onOpenStockIn,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Text("📦 ပစ္စည်းအဝင် သွင်းမည်", fontSize = 11.5.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Monthly Best Sellers Section
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(12.dp),
+                border = CardDefaults.outlinedCardBorder()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("📅 လအလိုက် အရောင်းသွက်ဆုံး ပစ္စည်းများ (Best Sellers by Month)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("မည်သည့်လတွင် မည်သည့်ပစ္စည်းများ ရောင်းအားအကောင်းဆုံးဖြစ်ခဲ့သည်ကို လေ့လာသုံးသပ်ချက်", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    if (monthlyBestSellers.isEmpty()) {
+                        Text("အရောင်းမှတ်တမ်း မရှိသေးပါ", fontSize = 12.sp, color = Color.Gray)
+                    } else {
+                        monthlyBestSellers.take(6).forEach { summary ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp)) {
+                                    Text("🗓️ ${summary.monthLabel}:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                                    summary.topProducts.forEach { item ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text("• ${item.productName}", fontSize = 11.5.sp)
+                                            Text("${item.totalQty} ခု ရောင်းချခဲ့ရ", fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp, color = Color(0xFF15803D))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Reorder & Purchase Recommendation List
+        item {
+            Text(
+                text = "⚠️ ဝယ်ယူသင့်သော & ပိုမှာသင့်သော ပစ္စည်းစာရင်း (Reorder List):",
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
+        items(recommendations, key = { it.product.productId }) { rec ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (rec.suggestedReorderQty > 0) Color(0xFFFFFBEB) else MaterialTheme.colorScheme.surface
+                ),
+                border = CardDefaults.outlinedCardBorder()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(rec.product.name, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("SKU: ${rec.product.sku} | အမျိုးအစား: ${rec.product.category}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (rec.suggestedReorderQty > 0) Color(0xFFFEE2E2) else Color(0xFFDCFCE7)
+                        ) {
+                            Text(
+                                text = rec.urgency,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (rec.suggestedReorderQty > 0) Color(0xFFDC2626) else Color(0xFF15803D),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("လက်ရှိ လက်ကျန်: ${rec.product.stockQuantity} ခု", fontSize = 11.sp)
+                        Text("ကာလအတွင်း ရောင်းရ: ${rec.soldInPeriod} ခု", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    if (rec.suggestedReorderQty > 0) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("📦 ပိုမှာသင့်သည့် ပမာဏ:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFB45309))
+                            Text(
+                                text = "+${rec.suggestedReorderQty} ခု (ခန့်မှန်း: %,d Ks)".format(rec.estimatedCost),
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color(0xFFB45309)
+                            )
+                        }
                     }
                 }
             }

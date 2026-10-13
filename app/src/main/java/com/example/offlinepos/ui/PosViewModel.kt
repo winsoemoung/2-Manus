@@ -92,6 +92,10 @@ class PosViewModel(private val context: Context) : ViewModel() {
     val salesHistory: StateFlow<List<SaleEntity>> = db.checkoutDao().observeSales()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // All Sale Items Flow (For In-Depth Product & Periodic Reorder Analytics)
+    val allSaleItems: StateFlow<List<SaleItemEntity>> = db.checkoutDao().observeAllSaleItems()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // Audit Events Flow
     val auditEvents: StateFlow<List<AuditEventEntity>> = db.checkoutDao().observeAuditEvents()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -929,9 +933,11 @@ class PosViewModel(private val context: Context) : ViewModel() {
     }
 
     fun authenticateManager(pin: String): Boolean {
-        return if (pin == "1234") {
-            _actor.value = Actor(userId = "မန်နေဂျာ (Manager)", canApplyDiscount = true)
-            setBanner("မန်နေဂျာ စနစ် ဖွင့်လှစ်ပြီးပါပြီ")
+        val managerPin = storeConfig.getManagerPin()
+        val ownerPin = storeConfig.getOwnerPin()
+        return if (pin == managerPin || pin == ownerPin) {
+            _actor.value = Actor(userId = if (pin == ownerPin) "ဆိုင်ရှင် (Store Owner)" else "မန်နေဂျာ (Manager)", canApplyDiscount = true)
+            setBanner("မန်နေဂျာ/ဆိုင်ရှင် စနစ် ဖွင့်လှစ်ပြီးပါပြီ")
             true
         } else {
             setBanner("မှားယွင်းသော PIN ဖြစ်ပါသည်")
@@ -1048,24 +1054,24 @@ class PosViewModel(private val context: Context) : ViewModel() {
     fun switchRole(role: String, pin: String): Boolean {
         return when (role) {
             "OWNER" -> {
-                if (pin == "7870") {
+                if (pin == storeConfig.getOwnerPin()) {
                     _currentRole.value = "OWNER"
                     _actor.value = Actor(userId = "ဆိုင်ရှင် (Store Owner)", canApplyDiscount = true)
                     setBanner("ဆိုင်ရှင် (Owner) စနစ်သို့ ပြောင်းလဲပြီးပါပြီ")
                     true
                 } else {
-                    setBanner("ဆိုင်ရှင် PIN မှားယွင်းပါသည် (Default: 7870)")
+                    setBanner("ဆိုင်ရှင် PIN မှားယွင်းပါသည်")
                     false
                 }
             }
             "MANAGER" -> {
-                if (pin == "1234") {
+                if (pin == storeConfig.getManagerPin() || pin == storeConfig.getOwnerPin()) {
                     _currentRole.value = "MANAGER"
                     _actor.value = Actor(userId = "မန်နေဂျာ (Manager)", canApplyDiscount = true)
                     setBanner("မန်နေဂျာ (Manager) စနစ်သို့ ပြောင်းလဲပြီးပါပြီ")
                     true
                 } else {
-                    setBanner("မန်နေဂျာ PIN မှားယွင်းပါသည် (Default: 1234)")
+                    setBanner("မန်နေဂျာ PIN မှားယွင်းပါသည်")
                     false
                 }
             }
@@ -1074,6 +1080,107 @@ class PosViewModel(private val context: Context) : ViewModel() {
                 _actor.value = Actor(userId = "အရောင်းတာဝန်ခံ (Cashier #1)", canApplyDiscount = false)
                 setBanner("အရောင်းတာဝန်ခံ (Cashier) စနစ်သို့ ပြောင်းလဲပြီးပါပြီ")
                 true
+            }
+        }
+    }
+
+    fun changeOwnerPin(oldPin: String, newPin: String): Boolean {
+        if (oldPin != storeConfig.getOwnerPin()) {
+            setBanner("လက်ရှိ ဆိုင်ရှင် PIN မမှန်ကန်ပါ")
+            return false
+        }
+        if (newPin.length < 4) {
+            setBanner("PIN အသစ်သည် အနည်းဆုံး ၄ လုံး ရှိရပါမည်")
+            return false
+        }
+        storeConfig.setOwnerPin(newPin)
+        setBanner("ဆိုင်ရှင် PIN အသစ်ကို အောင်မြင်စွာ ပြောင်းလဲပြီးပါပြီ")
+        return true
+    }
+
+    fun changeManagerPin(oldPin: String, newPin: String): Boolean {
+        if (oldPin != storeConfig.getManagerPin() && oldPin != storeConfig.getOwnerPin()) {
+            setBanner("လက်ရှိ မန်နေဂျာ/ဆိုင်ရှင် PIN မမှန်ကန်ပါ")
+            return false
+        }
+        if (newPin.length < 4) {
+            setBanner("PIN အသစ်သည် အနည်းဆုံး ၄ လုံး ရှိရပါမည်")
+            return false
+        }
+        storeConfig.setManagerPin(newPin)
+        setBanner("မန်နေဂျာ PIN အသစ်ကို အောင်မြင်စွာ ပြောင်းလဲပြီးပါပြီ")
+        return true
+    }
+
+    // AI PIN lock state
+    private val _isAiUnlocked = MutableStateFlow(false)
+    val isAiUnlocked: StateFlow<Boolean> = _isAiUnlocked.asStateFlow()
+
+    fun unlockAiWithPin(pin: String): Boolean {
+        return if (pin == storeConfig.getOwnerPin() || pin == storeConfig.getManagerPin()) {
+            _isAiUnlocked.value = true
+            setBanner("AI ကွပ်ကဲရေးစင်တာကို ဖွင့်လှစ်ပြီးပါပြီ")
+            true
+        } else {
+            setBanner("PIN မှားယွင်းနေပါသည်")
+            false
+        }
+    }
+
+    fun lockAi() {
+        _isAiUnlocked.value = false
+        setBanner("AI စနစ်ကို ပြန်လည်သော့ခတ်ပြီးပါပြီ")
+    }
+
+    // Google Account Backup State
+    private val _googleAccount = MutableStateFlow(storeConfig.getGoogleAccount())
+    val googleAccount: StateFlow<String?> = _googleAccount.asStateFlow()
+
+    private val _lastGoogleBackupTime = MutableStateFlow(storeConfig.getLastGoogleBackupTime())
+    val lastGoogleBackupTime: StateFlow<Long> = _lastGoogleBackupTime.asStateFlow()
+
+    fun connectGoogleAccount(email: String) {
+        val trimmed = email.trim()
+        if (trimmed.contains("@")) {
+            storeConfig.setGoogleAccount(trimmed)
+            _googleAccount.value = trimmed
+            setBanner("Google အကောင့် ($trimmed) ဖြင့် ချိတ်ဆက်ပြီးပါပြီ")
+        } else {
+            setBanner("မှန်ကန်သော Google Email လိပ်စာ ရိုက်ထည့်ပါ")
+        }
+    }
+
+    fun disconnectGoogleAccount() {
+        storeConfig.clearGoogleAccount()
+        _googleAccount.value = null
+        setBanner("Google အကောင့် ချိတ်ဆက်မှု ဖြုတ်ပြီးပါပြီ")
+    }
+
+    fun recordGoogleBackupSuccess() {
+        val now = System.currentTimeMillis()
+        storeConfig.setLastGoogleBackupTime(now)
+        _lastGoogleBackupTime.value = now
+    }
+
+    fun updateProduct(product: ProductEntity, onComplete: ((Boolean, String) -> Unit)? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val updated = product.copy(updatedAtEpochMs = System.currentTimeMillis())
+                val rows = db.productDao().update(updated)
+                withContext(Dispatchers.Main) {
+                    if (rows > 0) {
+                        setBanner("'${product.name}' ၏ အချက်အလက်များကို အောင်မြင်စွာ ပြင်ဆင်ပြီးပါပြီ")
+                        onComplete?.invoke(true, "အောင်မြင်စွာ ပြင်ဆင်ပြီးပါပြီ")
+                    } else {
+                        setBanner("ပြင်ဆင်မှု မအောင်မြင်ပါ")
+                        onComplete?.invoke(false, "ပြင်ဆင်မှု မအောင်မြင်ပါ")
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    setBanner("အမှားဖြစ်ပေါ်ပါသည်: ${e.localizedMessage}")
+                    onComplete?.invoke(false, e.localizedMessage ?: "Unknown error")
+                }
             }
         }
     }

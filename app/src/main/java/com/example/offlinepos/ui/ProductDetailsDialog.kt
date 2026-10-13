@@ -11,26 +11,38 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -39,10 +51,23 @@ import com.example.offlinepos.data.local.ProductEntity
 @Composable
 fun ProductDetailsDialog(
     product: ProductEntity,
+    categories: List<String> = emptyList(),
     onDismiss: () -> Unit,
     onAddToCart: (() -> Unit)? = null,
     onAdjustStock: ((Long) -> Unit)? = null,
+    onUpdateProduct: ((ProductEntity) -> Unit)? = null,
 ) {
+    var isEditing by remember { mutableStateOf(false) }
+    var editName by remember(product) { mutableStateOf(product.name) }
+    var editSku by remember(product) { mutableStateOf(product.sku) }
+    var editBarcode by remember(product) { mutableStateOf(product.barcode ?: "") }
+    var editCategory by remember(product) { mutableStateOf(product.category) }
+    var editSellPrice by remember(product) { mutableStateOf(product.sellPriceMinor.toString()) }
+    var editCostPrice by remember(product) { mutableStateOf(product.costPriceMinor.toString()) }
+    var editStock by remember(product) { mutableStateOf(product.stockQuantity.toString()) }
+    var editThreshold by remember(product) { mutableStateOf(product.lowStockThreshold.toString()) }
+    var editError by remember { mutableStateOf<String?>(null) }
+
     val profitMinor = product.sellPriceMinor - product.costPriceMinor
     val marginPercent = if (product.sellPriceMinor > 0) {
         (profitMinor * 100.0) / product.sellPriceMinor
@@ -72,16 +97,174 @@ fun ProductDetailsDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "ကုန်ပစ္စည်း အချက်အလက်",
+                        text = if (isEditing) "✏️ ပစ္စည်း ပြင်ဆင်ခြင်း" else "ကုန်ပစ္စည်း အချက်အလက်",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )
-                    IconButton(onClick = onDismiss, modifier = Modifier.testTag("close_details_button")) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (!isEditing && onUpdateProduct != null) {
+                            OutlinedButton(
+                                onClick = { isEditing = true },
+                                modifier = Modifier.height(34.dp).testTag("edit_product_button"),
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("ပြင်မည်", fontSize = 11.5.sp)
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        IconButton(onClick = onDismiss, modifier = Modifier.testTag("close_details_button")) {
+                            Icon(Icons.Default.Close, contentDescription = "Close")
+                        }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
+
+                if (isEditing) {
+                    // Edit Form
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("ပစ္စည်းအမည် (Product Name)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("edit_product_name_input"),
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text("အမျိုးအစား (Category):", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                    if (categories.isNotEmpty()) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        ) {
+                            items(categories) { cat ->
+                                FilterChip(
+                                    selected = editCategory.equals(cat, ignoreCase = true),
+                                    onClick = { editCategory = cat },
+                                    label = { Text(cat, fontSize = 11.sp) },
+                                )
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = editCategory,
+                        onValueChange = { editCategory = it },
+                        label = { Text("အမျိုးအစား စာသား") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("edit_product_category_input"),
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = editSku,
+                            onValueChange = { editSku = it },
+                            label = { Text("SKU နံပါတ်") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).testTag("edit_product_sku_input"),
+                        )
+                        OutlinedTextField(
+                            value = editBarcode,
+                            onValueChange = { editBarcode = it },
+                            label = { Text("Barcode") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).testTag("edit_product_barcode_input"),
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = editSellPrice,
+                            onValueChange = { editSellPrice = it },
+                            label = { Text("ရောင်းစျေး (Ks)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).testTag("edit_product_sell_price_input"),
+                        )
+                        OutlinedTextField(
+                            value = editCostPrice,
+                            onValueChange = { editCostPrice = it },
+                            label = { Text("ဝယ်ရင်းစျေး (Ks)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).testTag("edit_product_cost_price_input"),
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = editStock,
+                            onValueChange = { editStock = it },
+                            label = { Text("လက်ကျန် အရေအတွက်") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).testTag("edit_product_stock_input"),
+                        )
+                        OutlinedTextField(
+                            value = editThreshold,
+                            onValueChange = { editThreshold = it },
+                            label = { Text("သတိပေး လက်ကျန်") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).testTag("edit_product_threshold_input"),
+                        )
+                    }
+
+                    editError?.let {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = { isEditing = false },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("မလုပ်တော့ပါ")
+                        }
+                        Button(
+                            onClick = {
+                                if (editName.isBlank()) {
+                                    editError = "ပစ္စည်းအမည် ထည့်သွင်းပါ"
+                                    return@Button
+                                }
+                                val sellP = editSellPrice.toLongOrNull() ?: 0L
+                                val costP = editCostPrice.toLongOrNull() ?: 0L
+                                val stockQ = editStock.toLongOrNull() ?: product.stockQuantity
+                                val thresh = editThreshold.toLongOrNull() ?: product.lowStockThreshold
+
+                                val updated = product.copy(
+                                    name = editName.trim(),
+                                    sku = editSku.trim(),
+                                    barcode = if (editBarcode.isNotBlank()) editBarcode.trim() else null,
+                                    category = editCategory.trim(),
+                                    sellPriceMinor = sellP,
+                                    costPriceMinor = costP,
+                                    stockQuantity = stockQ,
+                                    lowStockThreshold = thresh,
+                                )
+                                onUpdateProduct?.invoke(updated)
+                                isEditing = false
+                            },
+                            modifier = Modifier.weight(1.5f).testTag("save_product_edit_button"),
+                        ) {
+                            Text("💾 သိမ်းဆည်းမည်")
+                        }
+                    }
+                } else {
 
                 // Product Visual & Name
                 Row(
@@ -212,6 +395,7 @@ fun ProductDetailsDialog(
             }
         }
     }
+}
 }
 
 @Composable

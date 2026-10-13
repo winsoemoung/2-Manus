@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -28,10 +29,14 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -81,13 +86,17 @@ fun AiCopilotScreen(
     val messages by viewModel.aiMessages.collectAsState()
     val isThinking by viewModel.isAiThinking.collectAsState()
     val storeProfile by viewModel.storeProfile.collectAsState()
+    val isAiUnlocked by viewModel.isAiUnlocked.collectAsState()
     var inputText by remember { mutableStateOf("") }
     var showSettingsDialog by remember { mutableStateOf(false) }
+
+    var pinInput by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf<String?>(null) }
 
     val listState = rememberLazyListState()
 
     // Scroll to latest message
-    LaunchedEffect(messages.size, isThinking) {
+    LaunchedEffect(messages.size, isThinking, inputText) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
@@ -148,7 +157,7 @@ fun AiCopilotScreen(
                                     color = Color(0xFFFEF3C7),
                                 ) {
                                     Text(
-                                        text = "🛡️ AI Privilege: FULL ACCESS",
+                                        text = if (isAiUnlocked) "🛡️ UNLOCKED" else "🔒 PIN LOCKED",
                                         fontSize = 9.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF92400E),
@@ -160,17 +169,25 @@ fun AiCopilotScreen(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = { viewModel.clearAiChat() },
-                        modifier = Modifier.testTag("clear_ai_chat_button")
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = "Clear Chat")
-                    }
-                    IconButton(
-                        onClick = { showSettingsDialog = true },
-                        modifier = Modifier.testTag("ai_settings_button")
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = "AI Settings")
+                    if (isAiUnlocked) {
+                        IconButton(
+                            onClick = { viewModel.lockAi() },
+                            modifier = Modifier.testTag("lock_ai_button")
+                        ) {
+                            Icon(Icons.Default.Lock, contentDescription = "Lock AI")
+                        }
+                        IconButton(
+                            onClick = { viewModel.clearAiChat() },
+                            modifier = Modifier.testTag("clear_ai_chat_button")
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Clear Chat")
+                        }
+                        IconButton(
+                            onClick = { showSettingsDialog = true },
+                            modifier = Modifier.testTag("ai_settings_button")
+                        ) {
+                            Icon(Icons.Default.Settings, contentDescription = "AI Settings")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -179,24 +196,107 @@ fun AiCopilotScreen(
             )
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            // Quick preset suggestions for code, promo, price, and actions
-            val promptSuggestions = listOf(
-                "📉 Dead Stock စစ်ဆေးပါ",
-                "⚠️ ပစ္စည်းမှာယူရန် Reorder စာရင်း",
-                "📊 အရောင်း & အမြတ် သုံးသပ်ချက်",
-                "➕ Code အသစ် 787-CEM-01 ထည့်ပါ",
-                "🔄 Code အစားထိုး ပြုပြင်ပါ",
-                "🎟️ Promo Code '787VIP' ၁၀% ထည့်ပါ",
-                "💰 အခွန်နှုန်းကို ၀% သို့ ပြင်ပါ",
-                "🏷️ သံချောင်း ဈေးနှုန်း ပြင်ပါ",
-                "⚡ AI Superuser အခွင့်အရေး စစ်ဆေးပါ",
-                "🛠️ သွပ်ပြား လက်ကျန် +၂၀ ထပ်ဖြည့်ပါ",
-            )
+        if (!isAiUnlocked) {
+            // PIN Protection Screen
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .imePadding()
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("ai_pin_lock_card"),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = CardDefaults.outlinedCardBorder(),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(64.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = "Lock",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "AI ကွပ်ကဲရေးစင်တာ (PIN သော့ခတ်ထားပါသည်)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "AI စနစ်ကို အသုံးပြုခွင့်ရရှိရန် ဆိုင်ရှင် သို့မဟုတ် မန်နေဂျာ PIN ရိုက်ထည့်ပါ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = pinInput,
+                            onValueChange = { pinInput = it },
+                            label = { Text("၄ လုံး PIN") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                            visualTransformation = PasswordVisualTransformation(),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().testTag("ai_pin_input"),
+                        )
+                        pinError?.let {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = {
+                                if (viewModel.unlockAiWithPin(pinInput)) {
+                                    pinInput = ""
+                                    pinError = null
+                                } else {
+                                    pinError = "PIN မှားယွင်းနေပါသည်။"
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(48.dp).testTag("ai_unlock_button"),
+                        ) {
+                            Text("သော့ဖွင့်၍ AI အသုံးပြုမည်")
+                        }
+                    }
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .imePadding()
+            ) {
+                // Quick preset suggestions for code, promo, price, and actions
+                val promptSuggestions = listOf(
+                    "📉 Dead Stock စစ်ဆေးပါ",
+                    "⚠️ ပစ္စည်းမှာယူရန် Reorder စာရင်း",
+                    "📊 အရောင်း & အမြတ် သုံးသပ်ချက်",
+                    "➕ Code အသစ် 787-CEM-01 ထည့်ပါ",
+                    "🔄 Code အစားထိုး ပြုပြင်ပါ",
+                    "🎟️ Promo Code '787VIP' ၁၀% ထည့်ပါ",
+                    "💰 အခွန်နှုန်းကို ၀% သို့ ပြင်ပါ",
+                    "🏷️ သံချောင်း ဈေးနှုန်း ပြင်ပါ",
+                    "⚡ AI Superuser အခွင့်အရေး စစ်ဆေးပါ",
+                    "🛠️ သွပ်ပြား လက်ကျန် +၂၀ ထပ်ဖြည့်ပါ",
+                )
 
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
@@ -328,6 +428,7 @@ fun AiCopilotScreen(
             }
         }
     }
+}
 
     if (showSettingsDialog) {
         AiSettingsDialog(

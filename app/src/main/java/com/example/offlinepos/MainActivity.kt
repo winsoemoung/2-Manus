@@ -233,12 +233,15 @@ fun MainApp(viewModel: PosViewModel) {
     }
 
     // Product Details Dialog (Shown on double tap from any search or inventory screen)
+    val allCategories by viewModel.categories.collectAsState()
     detailsProduct?.let { product ->
         ProductDetailsDialog(
             product = product,
+            categories = allCategories,
             onDismiss = { viewModel.dismissProductDetails() },
             onAddToCart = { viewModel.addToCart(product) },
             onAdjustStock = { qty -> viewModel.adjustStock(product.productId, qty) },
+            onUpdateProduct = { updated -> viewModel.updateProduct(updated) },
         )
     }
 

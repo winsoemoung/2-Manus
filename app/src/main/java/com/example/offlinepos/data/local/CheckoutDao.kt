@@ -15,6 +15,9 @@ abstract class CheckoutDao {
     @Query("SELECT * FROM sale_items WHERE saleId = :saleId")
     abstract suspend fun getItemsForSale(saleId: String): List<SaleItemEntity>
 
+    @Query("SELECT * FROM sale_items")
+    abstract fun observeAllSaleItems(): Flow<List<SaleItemEntity>>
+
     @Query("SELECT * FROM payments WHERE saleId = :saleId LIMIT 1")
     abstract suspend fun getPaymentForSale(saleId: String): PaymentEntity?
 

@@ -62,6 +62,32 @@ class StoreConfig(context: Context) {
         prefs.edit().putBoolean("ai_superuser_granted", granted).apply()
     }
 
+    // Owner PIN (Default: 7870)
+    fun getOwnerPin(): String = prefs.getString("store_owner_pin", "7870") ?: "7870"
+    fun setOwnerPin(newPin: String) {
+        prefs.edit().putString("store_owner_pin", newPin).apply()
+    }
+
+    // Manager PIN (Default: 1234)
+    fun getManagerPin(): String = prefs.getString("store_manager_pin", "1234") ?: "1234"
+    fun setManagerPin(newPin: String) {
+        prefs.edit().putString("store_manager_pin", newPin).apply()
+    }
+
+    // Google Drive Backup Account
+    fun getGoogleAccount(): String? = prefs.getString("google_backup_account", null)
+    fun setGoogleAccount(email: String) {
+        prefs.edit().putString("google_backup_account", email).apply()
+    }
+    fun clearGoogleAccount() {
+        prefs.edit().remove("google_backup_account").apply()
+    }
+
+    fun getLastGoogleBackupTime(): Long = prefs.getLong("last_google_backup_time", 0L)
+    fun setLastGoogleBackupTime(timeMs: Long) {
+        prefs.edit().putLong("last_google_backup_time", timeMs).apply()
+    }
+
     fun getPromoCodes(): List<PromoCode> {
         val raw = prefs.getString("promo_codes_json", null)
         if (raw.isNullOrBlank()) {

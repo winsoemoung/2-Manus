@@ -20,10 +20,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -79,6 +82,8 @@ fun CartSheet(
 ) {
     var discountTargetItem by remember { mutableStateOf<CartItem?>(null) }
     var discountInput by remember { mutableStateOf("") }
+    var quantityEditItem by remember { mutableStateOf<CartItem?>(null) }
+    var quantityInput by remember { mutableStateOf("") }
     var promoCodeInput by remember { mutableStateOf("") }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -180,6 +185,10 @@ fun CartSheet(
                                 canApplyDiscount = canApplyDiscount,
                                 onQuantityChange = { qty -> onQuantityChange(item.productId, qty) },
                                 onRemove = { onRemoveItem(item.productId) },
+                                onDirectQuantityClick = {
+                                    quantityEditItem = item
+                                    quantityInput = item.quantity.toString()
+                                },
                                 onDiscountClick = {
                                     if (canApplyDiscount) {
                                         discountTargetItem = item
@@ -364,6 +373,82 @@ fun CartSheet(
             }
         )
     }
+
+    // Direct numeric quantity input dialog for hundreds or thousands of products
+    quantityEditItem?.let { item ->
+        AlertDialog(
+            onDismissRequest = { quantityEditItem = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🔢 အရေအတွက် ရိုက်ထည့်ပါ", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = item.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "လက်ရှိ အရောင်း အရေအတွက်: ${item.quantity} ခု (ရာချီ/ထောင်ချီ ဂဏန်း တိုက်ရိုက် ရိုက်ထည့်နိုင်ပါသည်)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = quantityInput,
+                        onValueChange = { quantityInput = it.filter { ch -> ch.isDigit() } },
+                        label = { Text("အရေအတွက် (Quantity)") },
+                        placeholder = { Text("ဥပမာ - 100, 500, 1000...") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("direct_quantity_input_field"),
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("အမြန် ရွေးချယ်ရန် (Quick Set):", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        listOf(50L, 100L, 500L, 1000L).forEach { quickQty ->
+                            OutlinedButton(
+                                onClick = { quantityInput = quickQty.toString() },
+                                modifier = Modifier.weight(1f).height(36.dp),
+                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp)
+                            ) {
+                                Text("$quickQty", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val qty = quantityInput.toLongOrNull() ?: 0L
+                        if (qty > 0) {
+                            onQuantityChange(item.productId, qty)
+                        } else if (qty == 0L) {
+                            onRemoveItem(item.productId)
+                        }
+                        quantityEditItem = null
+                    },
+                    modifier = Modifier.testTag("apply_quantity_confirm_button")
+                ) {
+                    Text("အတည်ပြုမည်")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { quantityEditItem = null }) {
+                    Text("မလုပ်တော့ပါ")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -372,6 +457,7 @@ private fun CartItemRow(
     canApplyDiscount: Boolean,
     onQuantityChange: (Long) -> Unit,
     onRemove: () -> Unit,
+    onDirectQuantityClick: () -> Unit,
     onDiscountClick: () -> Unit,
 ) {
     Card(
@@ -434,12 +520,32 @@ private fun CartItemRow(
                     Text("-", fontWeight = FontWeight.Bold)
                 }
 
-                Text(
-                    text = "${item.quantity}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 6.dp),
-                )
+                Surface(
+                    onClick = onDirectQuantityClick,
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
+                    modifier = Modifier.testTag("direct_qty_badge_${item.productId}"),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "${item.quantity}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Edit quantity",
+                            modifier = Modifier.size(11.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
 
                 IconButton(
                     onClick = { onQuantityChange(item.quantity + 1) },
