@@ -206,13 +206,8 @@ object PdfReceiptHelper {
             y += 22f
         }
 
-        // Draw QR code if possible
-        val qrBitmap = QrCodeHelper.generateQrBitmap("787-POS:${receipt.saleId}:${receipt.totalMinor}Ks", 130)
-        if (qrBitmap != null) {
-            val qrLeft = (pageWidth - 130) / 2f
-            canvas.drawBitmap(qrBitmap, qrLeft, y, paint)
-            y += 140f
-        }
+        // QR Code removed as requested by user
+        y += 10f
 
         // Footer message
         paint.textAlign = Paint.Align.CENTER

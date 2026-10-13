@@ -881,7 +881,7 @@ fun SettingsScreen(
                     Text("စနစ် အချက်အလက်များ", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("• ဆိုင်: ${storeProfile.storeName}", style = MaterialTheme.typography.bodySmall)
-                    Text("• ဗားရှင်း: 1.0.0 (787_AI.apk)", style = MaterialTheme.typography.bodySmall)
+                    Text("• ဗားရှင်း: 13C (13C_787_AI_update.apk)", style = MaterialTheme.typography.bodySmall)
                     Text("• AI အဆင့်: Gemini 3.5 Flash Online + Superuser Local NLP Engine", style = MaterialTheme.typography.bodySmall)
                     Text("• Bluetooth Printer ပုံစံ: 80x80mm ESC/POS Thermal (576 dots)", style = MaterialTheme.typography.bodySmall)
                     Text("• မြန်မာစာ ပရင့်စနစ်: Native High-Resolution Canvas Rendering", style = MaterialTheme.typography.bodySmall)
@@ -1008,8 +1008,8 @@ fun SettingsScreen(
                         TextButton(onClick = { showChangeOwnerPinDialog = false }) { Text("မလုပ်တော့ပါ") }
                         Button(
                             onClick = {
-                                if (newOwnerPinInput.length < 4) {
-                                    ownerPinError = "PIN အသစ်သည် အနည်းဆုံး ၄ လုံး ရှိရပါမည်"
+                                if (newOwnerPinInput.length < 3) {
+                                    ownerPinError = "PIN အသစ်သည် အနည်းဆုံး ၃ လုံး ရှိရပါမည်"
                                     return@Button
                                 }
                                 if (newOwnerPinInput != confirmOwnerPinInput) {
@@ -1095,8 +1095,8 @@ fun SettingsScreen(
                         TextButton(onClick = { showChangeManagerPinDialog = false }) { Text("မလုပ်တော့ပါ") }
                         Button(
                             onClick = {
-                                if (newManagerPinInput.length < 4) {
-                                    managerPinError = "PIN အသစ်သည် အနည်းဆုံး ၄ လုံး ရှိရပါမည်"
+                                if (newManagerPinInput.length < 3) {
+                                    managerPinError = "PIN အသစ်သည် အနည်းဆုံး ၃ လုံး ရှိရပါမည်"
                                     return@Button
                                 }
                                 if (newManagerPinInput != confirmManagerPinInput) {

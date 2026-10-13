@@ -285,20 +285,7 @@ fun ReceiptDialog(
                             ReceiptRow("အကြွေးမှတ်တမ်းတင်ငွေ", "%,d Ks".format(receipt.totals.totalMinor), isHighlight = true)
                         }
 
-                        // QR Code inside Receipt
-                        val receiptQr = remember(receipt.saleId) {
-                            com.example.offlinepos.hardware.QrCodeHelper.generateQrBitmap("787POS:${receipt.saleId}:${receipt.totals.totalMinor}Ks", 160)
-                        }
-                        receiptQr?.let { bmp ->
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Image(
-                                bitmap = bmp.asImageBitmap(),
-                                contentDescription = "Receipt QR",
-                                modifier = Modifier
-                                    .size(100.dp)
-                                    .align(Alignment.CenterHorizontally)
-                            )
-                        }
+                        // QR code removed as requested
 
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
