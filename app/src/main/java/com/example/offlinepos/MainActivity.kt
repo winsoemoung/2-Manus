@@ -179,6 +179,7 @@ fun MainApp(viewModel: PosViewModel) {
             totals = totals,
             canApplyDiscount = actor.canApplyDiscount,
             taxRatePercent = storeProfile.taxRatePercent,
+            customLogoPath = storeProfile.customLogoPath,
             onQuantityChange = { id, qty -> viewModel.updateQuantity(id, qty) },
             onRemoveItem = { id -> viewModel.removeFromCart(id) },
             onApplyDiscount = { id, disc -> viewModel.applyDiscount(id, disc) },

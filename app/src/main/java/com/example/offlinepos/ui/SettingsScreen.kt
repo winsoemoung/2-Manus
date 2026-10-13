@@ -148,10 +148,29 @@ fun SettingsScreen(
                             contentDescription = "Lady Store Owner",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(72.dp)
+                                .size(74.dp)
                                 .clip(CircleShape)
-                                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                                .border(2.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                            onClick = {
+                                try {
+                                    logoPickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                } catch (e: Exception) {
+                                    viewModel.setBanner("ပုံရွေးချယ်မှု မအောင်မြင်ပါ: ${e.localizedMessage}")
+                                }
+                            }
                         )
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp),
+                            shadowElevation = 2.dp,
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("📷", fontSize = 11.sp)
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.width(14.dp))
@@ -180,9 +199,13 @@ fun SettingsScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(
                                 onClick = {
-                                    logoPickerLauncher.launch(
-                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                    )
+                                    try {
+                                        logoPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    } catch (e: Exception) {
+                                        viewModel.setBanner("ပုံရွေးချယ်မှု မအောင်မြင်ပါ: ${e.localizedMessage}")
+                                    }
                                 },
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                 modifier = Modifier.height(34.dp).testTag("change_store_logo_button"),
@@ -388,6 +411,9 @@ fun SettingsScreen(
                     val sampleTax = (10000.0 * currentRateVal / 100.0).toLong()
                     val sampleTotal = 10000L + sampleTax
 
+                    val formattedTax = "%,d".format(sampleTax)
+                    val formattedTotal = "%,d".format(sampleTotal)
+
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -401,7 +427,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "• အခွန် (${currentRateVal}%): %,d Ks\n• စုစုပေါင်း ကျသင့်ငွေ: %,d Ks".format(sampleTax, sampleTotal),
+                                text = "• အခွန် (${currentRateVal}%): $formattedTax Ks\n• စုစုပေါင်း ကျသင့်ငွေ: $formattedTotal Ks",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -459,23 +485,27 @@ fun SettingsScreen(
                         // Export & Share to Google Drive
                         Button(
                             onClick = {
-                                val exported = viewModel.exportDatabaseFile()
-                                if (exported != null) {
-                                    val uri: Uri = try {
-                                        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", exported)
-                                    } catch (e: Exception) {
-                                        Uri.fromFile(exported)
+                                try {
+                                    val exported = viewModel.exportDatabaseFile()
+                                    if (exported != null) {
+                                        val uri: Uri = try {
+                                            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", exported)
+                                        } catch (e: Exception) {
+                                            Uri.fromFile(exported)
+                                        }
+                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "application/octet-stream"
+                                            putExtra(Intent.EXTRA_STREAM, uri)
+                                            putExtra(Intent.EXTRA_SUBJECT, "ဆန်းသစ် POS ဒေတာ Backup")
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(Intent.createChooser(shareIntent, "Google Drive သို့ Upload ရန် သို့မဟုတ် ဖိုင်သိမ်းရန်"))
+                                        backupStatusMessage = "Backup ဖိုင် (${exported.name}) ကို အောင်မြင်စွာ ထုတ်ယူပြီးပါပြီ"
+                                    } else {
+                                        backupStatusMessage = "Backup ထုတ်ယူခြင်း မအောင်မြင်ပါ"
                                     }
-                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "application/octet-stream"
-                                        putExtra(Intent.EXTRA_STREAM, uri)
-                                        putExtra(Intent.EXTRA_SUBJECT, "ဆန်းသစ် POS ဒေတာ Backup")
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    context.startActivity(Intent.createChooser(shareIntent, "Google Drive သို့ Upload ရန် သို့မဟုတ် ဖိုင်သိမ်းရန်"))
-                                    backupStatusMessage = "Backup ဖိုင် (${exported.name}) ကို အောင်မြင်စွာ ထုတ်ယူပြီးပါပြီ"
-                                } else {
-                                    backupStatusMessage = "Backup ထုတ်ယူခြင်း မအောင်မြင်ပါ"
+                                } catch (e: Exception) {
+                                    backupStatusMessage = "Backup လုပ်ဆောင်ရာတွင် ချို့ယွင်းချက်ဖြစ်ပေါ်ပါသည်: ${e.localizedMessage}"
                                 }
                             },
                             modifier = Modifier.weight(1f).testTag("export_backup_button"),
@@ -486,7 +516,11 @@ fun SettingsScreen(
                         // Import & Restore
                         OutlinedButton(
                             onClick = {
-                                importFileLauncher.launch(arrayOf("*/*"))
+                                try {
+                                    importFileLauncher.launch(arrayOf("*/*"))
+                                } catch (e: Exception) {
+                                    backupStatusMessage = "ဖိုင်ရွေးချယ်မှုကို ဖွင့်မရပါ: ${e.localizedMessage}"
+                                }
                             },
                             modifier = Modifier.weight(0.7f).testTag("import_backup_button"),
                         ) {
@@ -682,8 +716,9 @@ fun SettingsScreen(
                                 shape = RoundedCornerShape(6.dp),
                                 color = MaterialTheme.colorScheme.primaryContainer,
                             ) {
+                                val discLabel = if (p.discountPercent > 0) "${p.discountPercent}% Off" else "${"%,d".format(p.discountFlatMinor)} Ks Off"
                                 Text(
-                                    text = if (p.discountPercent > 0) "${p.discountPercent}% Off" else "%,d Ks Off".format(p.discountFlatMinor),
+                                    text = discLabel,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,

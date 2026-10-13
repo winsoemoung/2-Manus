@@ -11,6 +11,9 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import com.example.offlinepos.ui.ReceiptData
 import com.example.offlinepos.ui.StoreProfile
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import com.example.offlinepos.R
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -26,7 +29,7 @@ object PdfReceiptHelper {
     ): Uri? {
         val pdfDocument = PdfDocument()
         val pageWidth = 450
-        val baseHeight = 600
+        val baseHeight = 650
         val itemHeight = 35
         val pageHeight = baseHeight + (receipt.items.size * itemHeight)
 
@@ -42,7 +45,27 @@ object PdfReceiptHelper {
         // Draw background
         canvas.drawColor(Color.WHITE)
 
-        var y = 45f
+        var y = 35f
+
+        // Draw Store Logo if available
+        val logoBitmap = try {
+            val customPath = storeProfile.customLogoPath?.substringBefore("?")
+            if (!customPath.isNullOrBlank()) {
+                val f = File(customPath)
+                if (f.exists() && f.canRead()) BitmapFactory.decodeFile(f.absolutePath) else null
+            } else {
+                BitmapFactory.decodeResource(context.resources, R.drawable.img_lady_owner)
+            }
+        } catch (e: Exception) {
+            null
+        }
+
+        if (logoBitmap != null) {
+            val logoSize = 54
+            val scaled = Bitmap.createScaledBitmap(logoBitmap, logoSize, logoSize, true)
+            canvas.drawBitmap(scaled, (pageWidth - logoSize) / 2f, y, paint)
+            y += logoSize + 14f
+        }
 
         // 1. Store Header
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)

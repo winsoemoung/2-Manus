@@ -261,7 +261,7 @@ fun CheckoutDialog(
                         )
                         customers.forEach { c ->
                             DropdownMenuItem(
-                                text = { Text("${c.name} (${c.phone}) - အကြွေးကျန်: %,d Ks".format(c.currentDebtMinor)) },
+                                text = { Text("${c.name} (${c.phone}) - အကြွေးကျန်: ${"%,d".format(c.currentDebtMinor)} Ks") },
                                 onClick = {
                                     selectedCustomer = c
                                     customerDropdownOpen = false
@@ -451,7 +451,7 @@ fun CheckoutDialog(
                                     )
                                 } else {
                                     Text(
-                                        text = "ဝယ်သူ: ${selectedCustomer!!.name} (လက်ရှိကျန်ငွေ: %,d Ks)".format(selectedCustomer!!.currentDebtMinor),
+                                        text = "ဝယ်သူ: ${selectedCustomer!!.name} (လက်ရှိကျန်ငွေ: ${"%,d".format(selectedCustomer!!.currentDebtMinor)} Ks)",
                                         fontSize = 12.sp,
                                         color = Color.DarkGray
                                     )

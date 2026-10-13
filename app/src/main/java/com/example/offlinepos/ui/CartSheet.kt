@@ -2,6 +2,7 @@ package com.example.offlinepos.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,6 +66,7 @@ fun CartSheet(
     totals: CartTotals,
     canApplyDiscount: Boolean,
     taxRatePercent: Double = 0.0,
+    customLogoPath: String? = null,
     onQuantityChange: (productId: Long, qty: Long) -> Unit,
     onRemoveItem: (productId: Long) -> Unit,
     onApplyDiscount: (productId: Long, discountMinor: Long) -> Unit,
@@ -99,17 +101,27 @@ fun CartSheet(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column {
-                        Text(
-                            text = "Current Order",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        StoreLogoAvatar(
+                            customLogoPath = customLogoPath,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .border(1.5.dp, MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.CircleShape),
                         )
-                        Text(
-                            text = "${items.size} item(s) in cart",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Current Order",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                text = "${items.size} item(s) in cart",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                     Row {
                         if (items.isNotEmpty()) {

@@ -457,12 +457,24 @@ class PosViewModel(private val context: Context) : ViewModel() {
     fun saveStoreLogo(uri: Uri, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val targetFile = File(context.filesDir, "store_custom_logo.jpg")
+                // Delete previous custom logos
+                context.filesDir.listFiles { _, name -> name.startsWith("store_custom_logo") }?.forEach {
+                    try { it.delete() } catch (_: Exception) {}
+                }
+
+                val timestamp = System.currentTimeMillis()
+                val targetFile = File(context.filesDir, "store_custom_logo_$timestamp.jpg")
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     FileOutputStream(targetFile).use { output ->
                         input.copyTo(output)
                     }
                 }
+
+                try {
+                    val staticFile = File(context.filesDir, "store_custom_logo.jpg")
+                    targetFile.copyTo(staticFile, overwrite = true)
+                } catch (_: Exception) {}
+
                 val updatedProfile = _storeProfile.value.copy(customLogoPath = targetFile.absolutePath)
                 storeConfig.saveProfile(updatedProfile)
                 _storeProfile.value = updatedProfile
@@ -478,9 +490,8 @@ class PosViewModel(private val context: Context) : ViewModel() {
     }
 
     fun resetStoreLogo() {
-        val targetFile = File(context.filesDir, "store_custom_logo.jpg")
-        if (targetFile.exists()) {
-            targetFile.delete()
+        context.filesDir.listFiles { _, name -> name.startsWith("store_custom_logo") }?.forEach {
+            try { it.delete() } catch (_: Exception) {}
         }
         val updatedProfile = _storeProfile.value.copy(customLogoPath = null)
         storeConfig.saveProfile(updatedProfile)

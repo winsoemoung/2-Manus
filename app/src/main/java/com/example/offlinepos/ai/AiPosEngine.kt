@@ -512,7 +512,7 @@ class AiPosEngine(private val context: Context) {
                 privilegeLevel = "AI_SUPERUSER",
             )
             return Pair(
-                "အကြံပြုချက်: '$detectedName' (Code: $newCode၊ ရောင်းဈေး: %,d Ks၊ လက်ကျန်: ၅၀) ကို 787 စနစ်ထဲသို့ Code အသစ်ဖြင့် ထည့်သွင်းပေးရန် AI အမိန့်ထုတ်ပေးထားပါသည်။".format(price),
+                "အကြံပြုချက်: '$detectedName' (Code: $newCode၊ ရောင်းဈေး: ${"%,d".format(price)} Ks၊ လက်ကျန်: ၅၀) ကို 787 စနစ်ထဲသို့ Code အသစ်ဖြင့် ထည့်သွင်းပေးရန် AI အမိန့်ထုတ်ပေးထားပါသည်။",
                 action
             )
         }
@@ -526,7 +526,7 @@ class AiPosEngine(private val context: Context) {
             if (matchedProduct != null) {
                 val action = AiAction(
                     id = UUID.randomUUID().toString(),
-                    summary = "'${matchedProduct.name}' ၏ ဈေးနှုန်းကို %,d Ks သို့ ပြင်ဆင်ခြင်း".format(newPrice),
+                    summary = "'${matchedProduct.name}' ၏ ဈေးနှုန်းကို ${"%,d".format(newPrice)} Ks သို့ ပြင်ဆင်ခြင်း",
                     type = AiActionType.UpdatePrice(
                         productId = matchedProduct.productId,
                         productName = matchedProduct.name,
@@ -535,7 +535,7 @@ class AiPosEngine(private val context: Context) {
                     privilegeLevel = "AI_SUPERUSER",
                 )
                 return Pair(
-                    "'${matchedProduct.name}' ၏ လက်ရှိရောင်းဈေး (%,d Ks) မှ ဈေးနှုန်းသစ် (%,d Ks) သို့ အစားထိုး ပြင်ဆင်ရန် အတည်ပြုပေးထားပါသည်။".format(matchedProduct.sellPriceMinor, newPrice),
+                    "'${matchedProduct.name}' ၏ လက်ရှိရောင်းဈေး (${"%,d".format(matchedProduct.sellPriceMinor)} Ks) မှ ဈေးနှုန်းသစ် (${"%,d".format(newPrice)} Ks) သို့ အစားထိုး ပြင်ဆင်ရန် အတည်ပြုပေးထားပါသည်။",
                     action
                 )
             }
@@ -566,7 +566,7 @@ class AiPosEngine(private val context: Context) {
         if (lower.contains("dead stock") || lower.contains("အရောင်းထိုင်း") || lower.contains("မရောင်းရ") || lower.contains("deadstock")) {
             val stagnantItems = products.filter { it.stockQuantity > it.lowStockThreshold }.take(5)
             val listStr = stagnantItems.joinToString("\n") { p ->
-                "• ${p.name} (SKU: ${p.sku}) - လက်ကျန်: ${p.stockQuantity} ${p.unitName} (အရင်း: %,d Ks / ရောင်းဈေး: %,d Ks)".format(p.costPriceMinor, p.sellPriceMinor)
+                "• ${p.name} (SKU: ${p.sku}) - လက်ကျန်: ${p.stockQuantity} ${p.unitName} (အရင်း: ${"%,d".format(p.costPriceMinor)} Ks / ရောင်းဈေး: ${"%,d".format(p.sellPriceMinor)} Ks)"
             }
             return Pair(
                 """
@@ -604,18 +604,33 @@ class AiPosEngine(private val context: Context) {
             )
         }
 
+        // App Logo & Store Image Guide
+        if (lower.contains("logo") || lower.contains("လိုဂို") || lower.contains("avatar") || lower.contains("ပုံပြောင်း")) {
+            return Pair(
+                """
+                🖼️ **787 AI - ဆိုင် Logo / App Image ပြောင်းလဲခြင်း စနစ်လမ်းညွှန်:**
+                • ဆက်တင် (Settings) တက်ဘ်ရှိ 'ဆိုင်ရှင် Profile' ကတ်တွင် **'🖼️ ပုံပြောင်းမည်'** ခလုတ် သို့မဟုတ် **📷 ကင်မရာပုံကို နှိပ်၍** မိမိစိတ်ကြိုက် ဓာတ်ပုံကို ရွေးချယ်နိုင်ပါသည်။
+                • ဓာတ်ပုံရွေးချယ်ပြီးသည်နှင့် စနစ်အတွင်းရှိ နေရာတိုင်း (Home Screen၊ ပစ္စည်းစာရင်း၊ အရောင်းပြက္ခဒိန်၊ AI ကွပ်ကဲရေးစင်တာ၊ တွက်ချက်မှုပြေစာနှင့် PDF ဘေလ်) အားလုံးတွင် အလိုအလျောက် တပြိုင်နက် လိုက်ပါပြောင်းလဲသွားပါမည်။
+                • မူလ App Logo သို့ ပြန်ထားလိုပါက **'မူလပုံ ပြန်ထားမည်'** ကို နှိပ်နိုင်ပါသည်။
+                """.trimIndent(),
+                null
+            )
+        }
+
         // 12. Sales Report & Analysis
         if (lower.contains("အရောင်း") || lower.contains("အစီရင်ခံစာ") || lower.contains("report") || lower.contains("သုံးသပ်") || lower.contains("အမြတ်")) {
             val totalRevenue = sales.sumOf { it.totalMinor }
             val totalOrders = sales.size
             val lowStockCount = products.count { it.stockQuantity <= it.lowStockThreshold }
             val estimatedGrossProfit = (totalRevenue * 0.22).toLong()
+            val formattedRevenue = "%,d".format(totalRevenue)
+            val formattedProfit = "%,d".format(estimatedGrossProfit)
             return Pair(
                 """
                 📊 **787 POS (${storeProfile.storeName}) အရောင်းနှင့် အမြတ် သုံးသပ်ချက် အစီရင်ခံစာ:**
                 • စုစုပေါင်း အော်ဒါအရေအတွက်: $totalOrders ခု
-                • စုစုပေါင်း အရောင်းရငွေ: %,d Ks
-                • ခန့်မှန်း အသားတင်အမြတ်ငွေ: %,d Ks (Margin ~22%)
+                • စုစုပေါင်း အရောင်းရငွေ: $formattedRevenue Ks
+                • ခန့်မှန်း အသားတင်အမြတ်ငွေ: $formattedProfit Ks (Margin ~22%)
                 • လက်ရှိ ပစ္စည်းအမျိုးအမည်: ${products.size} မျိုး
                 • လက်ကျန်နည်းနေသော ပစ္စည်း: $lowStockCount မျိုး
                 • AI Superuser Privilege: ခွင့်ပြုထားပြီး (Authorized)
@@ -624,7 +639,7 @@ class AiPosEngine(private val context: Context) {
                 ၁။ လက်ကျန်နည်းနေသော ပစ္စည်းများကို Reorder စာရင်းထုတ်၍ ကြိုတင်မှာယူနိုင်ပါသည်။
                 ၂။ အရောင်းပြေစာ အခွန်နှုန်းထားမှာ လက်ရှိ ${storeProfile.taxRatePercent}% ဖြစ်ပါသည်။
                 ၃။ Code အသစ်ထည့်ခြင်း၊ Code အစားထိုးခြင်း၊ Promo Code ထည့်ခြင်း များကို AI အား ချက်ချင်း အမိန့်ပေးခိုင်းစေနိုင်ပါသည်။
-                """.trimIndent().format(totalRevenue, estimatedGrossProfit),
+                """.trimIndent(),
                 null
             )
         }

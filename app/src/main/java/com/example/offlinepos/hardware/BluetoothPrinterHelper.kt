@@ -11,10 +11,12 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.graphics.BitmapFactory
 import com.example.offlinepos.ui.ReceiptData
 import com.example.offlinepos.ui.StoreProfile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -71,8 +73,20 @@ object BluetoothPrinterHelper {
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
 
+        val logoBitmap = try {
+            val customPath = profile.customLogoPath?.substringBefore("?")
+            if (!customPath.isNullOrBlank()) {
+                val f = File(customPath)
+                if (f.exists() && f.canRead()) BitmapFactory.decodeFile(f.absolutePath) else null
+            } else null
+        } catch (e: Exception) {
+            null
+        }
+
+        val logoExtraHeight = if (logoBitmap != null) 90 else 0
+
         // Estimate height
-        val baseHeaderHeight = 220
+        val baseHeaderHeight = 220 + logoExtraHeight
         val itemsHeight = (receipt.items.size * 55) + 60
         val summaryHeight = 260
         val footerLines = profile.footerMessage.split("\n").size
@@ -83,7 +97,14 @@ object BluetoothPrinterHelper {
         val canvas = Canvas(bitmap)
         canvas.drawColor(Color.WHITE)
 
-        var y = 45f
+        var y = 35f
+
+        if (logoBitmap != null) {
+            val logoSize = 70
+            val scaled = Bitmap.createScaledBitmap(logoBitmap, logoSize, logoSize, true)
+            canvas.drawBitmap(scaled, (width - logoSize) / 2f, y, paintBody)
+            y += logoSize + 15f
+        }
 
         // 1. Store Name (Large Bold Centered)
         canvas.drawText(profile.storeName, width / 2f, y, paintTitle)
