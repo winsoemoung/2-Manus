@@ -162,4 +162,25 @@ class StoreConfig(context: Context) {
         }
         prefs.edit().putString("promo_codes_json", jsonArray.toString()).apply()
     }
+
+    // App Mode: Server POS (False) vs Staff Client Mode (True)
+    fun isStaffClientMode(): Boolean = prefs.getBoolean("is_staff_client_mode", false)
+    fun setStaffClientMode(isClient: Boolean) {
+        prefs.edit().putBoolean("is_staff_client_mode", isClient).apply()
+    }
+
+    fun getServerPort(): Int = prefs.getInt("local_server_port", 8787)
+    fun setServerPort(port: Int) {
+        prefs.edit().putInt("local_server_port", port).apply()
+    }
+
+    fun getLastConnectedServerUrl(): String = prefs.getString("last_connected_server_url", "http://192.168.1.10:8787") ?: "http://192.168.1.10:8787"
+    fun setLastConnectedServerUrl(url: String) {
+        prefs.edit().putString("last_connected_server_url", url).apply()
+    }
+
+    fun getStaffName(): String = prefs.getString("staff_client_name", "ဆိုင်ဝန်ထမ်း #1") ?: "ဆိုင်ဝန်ထမ်း #1"
+    fun setStaffName(name: String) {
+        prefs.edit().putString("staff_client_name", name).apply()
+    }
 }

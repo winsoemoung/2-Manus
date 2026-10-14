@@ -42,6 +42,7 @@ import com.example.offlinepos.ui.ReceiptDialog
 import com.example.offlinepos.ui.RoofingCalculatorDialog
 import com.example.offlinepos.ui.SalesHistoryScreen
 import com.example.offlinepos.ui.SettingsScreen
+import com.example.offlinepos.ui.StaffClientScreen
 import com.example.offlinepos.ui.theme.OfflinePOSTheme
 
 enum class PosTab(val title: String) {
@@ -68,6 +69,18 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainApp(viewModel: PosViewModel) {
+    val isStaffClientMode by viewModel.isStaffClientMode.collectAsState()
+
+    if (isStaffClientMode) {
+        StaffClientScreen(
+            viewModel = viewModel,
+            onSwitchToServerMode = {
+                viewModel.setStaffClientMode(false)
+            }
+        )
+        return
+    }
+
     var selectedTab by remember { mutableStateOf(PosTab.REGISTER) }
     var showCartSheet by remember { mutableStateOf(false) }
     var showCheckoutDialog by remember { mutableStateOf(false) }

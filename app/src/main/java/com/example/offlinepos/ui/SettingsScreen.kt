@@ -100,6 +100,12 @@ fun SettingsScreen(
     var confirmManagerPinInput by remember { mutableStateOf("") }
     var managerPinError by remember { mutableStateOf<String?>(null) }
 
+    val isServerRunning by viewModel.isServerRunning.collectAsState()
+    val serverUrl by viewModel.serverUrl.collectAsState()
+    val serverIp by viewModel.serverIp.collectAsState()
+    val receivedCount by viewModel.serverReceivedCount.collectAsState()
+    var showServerDialog by remember { mutableStateOf(false) }
+
     // Store profile editing states
     var storeName by remember(storeProfile) { mutableStateOf(storeProfile.storeName) }
     var address by remember(storeProfile) { mutableStateOf(storeProfile.address) }
@@ -871,6 +877,89 @@ fun SettingsScreen(
                 }
             }
 
+            // 13D Main Server & Staff Client Network
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = CardDefaults.outlinedCardBorder()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("🌐 Main Server နှင့် ဆိုင်ဝန်ထမ်း Client စနစ်", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Local Wi-Fi ကွန်ရက်အတွင်း ဝန်ထမ်းဖုန်းများမှ ကုန်ပစ္စည်းလှမ်းထည့်ခြင်း", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isServerRunning) Color(0xFFDCFCE7) else Color(0xFFFEE2E2),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isServerRunning) "🟢 Server Online (လည်ပတ်နေပါသည်)" else "🔴 Server ရပ်တန့်ထားပါသည်",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.5.sp,
+                                    color = if (isServerRunning) Color(0xFF15803D) else Color(0xFFB91C1C)
+                                )
+                                if (isServerRunning) {
+                                    Text(
+                                        text = "လိပ်စာ: $serverUrl",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF166534),
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = "ဝန်ထမ်းများထံမှ လက်ခံရရှိမှု: $receivedCount ခု",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF166534)
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = isServerRunning,
+                                onCheckedChange = { start ->
+                                    if (start) viewModel.startLocalServer() else viewModel.stopLocalServer()
+                                }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { showServerDialog = true },
+                            modifier = Modifier.weight(1f).testTag("open_server_status_btn"),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Text("📡 Server QR & အခြေအနေ", fontSize = 11.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = { viewModel.setStaffClientMode(true) },
+                            modifier = Modifier.weight(1f).testTag("switch_to_client_mode_btn"),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Text("📱 ဝန်ထမ်း Client သို့", fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Terminal Information
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -881,7 +970,9 @@ fun SettingsScreen(
                     Text("စနစ် အချက်အလက်များ", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("• ဆိုင်: ${storeProfile.storeName}", style = MaterialTheme.typography.bodySmall)
-                    Text("• ဗားရှင်း: 13C (13C_787_AI_update.apk)", style = MaterialTheme.typography.bodySmall)
+                    Text("• ဗားရှင်း: 13D (13D_787_AI_update.apk)", style = MaterialTheme.typography.bodySmall)
+                    Text("• ဆာဗာ အဆင့်: Local Embedded HTTP REST & WebSocket (Port 8787)", style = MaterialTheme.typography.bodySmall)
+                    Text("• ဆိုင်ဝန်ထမ်း Client စနစ်: client.apk နှင့် HTML5 Web App အပြည့်အစုံ", style = MaterialTheme.typography.bodySmall)
                     Text("• AI အဆင့်: Gemini 3.5 Flash Online + Superuser Local NLP Engine", style = MaterialTheme.typography.bodySmall)
                     Text("• Bluetooth Printer ပုံစံ: 80x80mm ESC/POS Thermal (576 dots)", style = MaterialTheme.typography.bodySmall)
                     Text("• မြန်မာစာ ပရင့်စနစ်: Native High-Resolution Canvas Rendering", style = MaterialTheme.typography.bodySmall)
@@ -1117,5 +1208,16 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    if (showServerDialog) {
+        ServerStatusDialog(
+            viewModel = viewModel,
+            onDismiss = { showServerDialog = false },
+            onOpenStaffClient = {
+                showServerDialog = false
+                viewModel.setStaffClientMode(true)
+            }
+        )
     }
 }

@@ -42,7 +42,10 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import com.example.offlinepos.server.LocalPosServer
+import com.example.offlinepos.server.RemoteProductDto
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -75,6 +78,25 @@ class PosViewModel(private val context: Context) : ViewModel() {
         db = db,
         now = { System.currentTimeMillis() },
     )
+
+    // Local POS Server for Staff Clients over Wi-Fi
+    private val _isServerRunning = MutableStateFlow(false)
+    val isServerRunning: StateFlow<Boolean> = _isServerRunning.asStateFlow()
+
+    private val _serverUrl = MutableStateFlow("")
+    val serverUrl: StateFlow<String> = _serverUrl.asStateFlow()
+
+    private val _serverIp = MutableStateFlow("127.0.0.1")
+    val serverIp: StateFlow<String> = _serverIp.asStateFlow()
+
+    private val _serverReceivedCount = MutableStateFlow(0)
+    val serverReceivedCount: StateFlow<Int> = _serverReceivedCount.asStateFlow()
+
+    private val _isStaffClientMode = MutableStateFlow(storeConfig.isStaffClientMode())
+    val isStaffClientMode: StateFlow<Boolean> = _isStaffClientMode.asStateFlow()
+
+    var localServer: LocalPosServer? = null
+        private set
 
     // Current cashier / actor
     private val _actor = MutableStateFlow(Actor(userId = "အရောင်းတာဝန်ခံ (Cashier #1)", canApplyDiscount = false))
@@ -205,6 +227,9 @@ class PosViewModel(private val context: Context) : ViewModel() {
     init {
         viewModelScope.launch {
             seedConstructionCatalogIfEmpty()
+        }
+        if (!storeConfig.isStaffClientMode()) {
+            startLocalServer()
         }
     }
 
@@ -1582,6 +1607,93 @@ class PosViewModel(private val context: Context) : ViewModel() {
     fun setDateFilter(startMs: Long, endMs: Long) {
         _filterStartDate.value = startMs
         _filterEndDate.value = endMs
+    }
+
+    // Local POS Server Management
+    fun startLocalServer() {
+        if (localServer == null) {
+            localServer = LocalPosServer(
+                context = context,
+                port = storeConfig.getServerPort(),
+                onProductReceived = { dto -> insertRemoteProduct(dto) },
+                onGetProducts = { db.productDao().observeActive().first() },
+                onGetCategories = { db.productDao().observeCategories().first() },
+                getStoreName = { storeProfile.value.storeName }
+            )
+        }
+        localServer?.start()
+        _isServerRunning.value = localServer?.isRunning == true
+        _serverIp.value = localServer?.getLocalIpAddress() ?: "127.0.0.1"
+        _serverUrl.value = localServer?.getServerUrl() ?: ""
+    }
+
+    fun stopLocalServer() {
+        localServer?.stop()
+        _isServerRunning.value = false
+    }
+
+    fun setStaffClientMode(isClient: Boolean) {
+        storeConfig.setStaffClientMode(isClient)
+        _isStaffClientMode.value = isClient
+        if (isClient) {
+            stopLocalServer()
+        } else {
+            startLocalServer()
+        }
+    }
+
+    suspend fun insertRemoteProduct(dto: RemoteProductDto): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        try {
+            val now = System.currentTimeMillis()
+            // If barcode exists, update existing product
+            if (!dto.barcode.isNullOrBlank()) {
+                val existing = db.productDao().findByBarcode(dto.barcode)
+                if (existing != null) {
+                    val updated = existing.copy(
+                        name = dto.name.ifBlank { existing.name },
+                        sellPriceMinor = if (dto.sellPriceMinor > 0) dto.sellPriceMinor else existing.sellPriceMinor,
+                        costPriceMinor = if (dto.costPriceMinor > 0) dto.costPriceMinor else existing.costPriceMinor,
+                        stockQuantity = existing.stockQuantity + dto.stockQuantity,
+                        updatedAtEpochMs = now,
+                        category = dto.category.ifBlank { existing.category }
+                    )
+                    db.productDao().update(updated)
+                    _serverReceivedCount.value = _serverReceivedCount.value + 1
+                    withContext(Dispatchers.Main) {
+                        setBanner("📢 ဝန်ထမ်း (${dto.staffName}) မှ [${dto.name}] လက်ကျန် +${dto.stockQuantity} ကို ပေါင်းထည့်ပေးပို့လိုက်ပါပြီ")
+                    }
+                    return@withContext Pair(true, "[${dto.name}] လက်ကျန်ကို +${dto.stockQuantity} ခုဖြင့် အောင်မြင်စွာ တိုးမြှင့်ပေါင်းထည့်ပြီးပါပြီ")
+                }
+            }
+
+            // Insert new product into Database
+            val newEntity = ProductEntity(
+                name = dto.name,
+                sku = dto.sku.ifBlank { "PROD-${System.currentTimeMillis() % 100000}" },
+                barcode = dto.barcode?.ifBlank { null },
+                costPriceMinor = dto.costPriceMinor,
+                sellPriceMinor = dto.sellPriceMinor,
+                stockQuantity = dto.stockQuantity,
+                category = dto.category.ifBlank { "အထွေထွေ" },
+                isRoofingSheet = false,
+                lowStockThreshold = dto.lowStockThreshold,
+                unitName = dto.unitName.ifBlank { "ခု" },
+                updatedAtEpochMs = now,
+            )
+            db.productDao().insert(newEntity)
+            _serverReceivedCount.value = _serverReceivedCount.value + 1
+            withContext(Dispatchers.Main) {
+                setBanner("📢 ဝန်ထမ်း (${dto.staffName}) မှ ကုန်ပစ္စည်းအသစ် [${dto.name}] (${dto.stockQuantity} ခု) ကို ပေါင်းထည့်ပေးပို့လိုက်ပါပြီ")
+            }
+            Pair(true, "ကုန်ပစ္စည်း အသစ် [${dto.name}] ကို Database ထဲသို့ အောင်မြင်စွာ ပေါင်းထည့်ပြီးပါပြီ")
+        } catch (e: Exception) {
+            Pair(false, e.message ?: "ထည့်သွင်းခြင်း မအောင်မြင်ပါ")
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        localServer?.stop()
     }
 
     companion object {

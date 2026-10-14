@@ -70,6 +70,7 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.PauseCircleOutline
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Wifi
 import com.example.offlinepos.R
 import com.example.offlinepos.data.local.ProductEntity
 
@@ -94,6 +95,8 @@ fun HomeScreen(
     var showHoldOrders by remember { mutableStateOf(false) }
     var showCustomerLedger by remember { mutableStateOf(false) }
     var showShiftReport by remember { mutableStateOf(false) }
+    var showServerDialog by remember { mutableStateOf(false) }
+    val isServerRunning by viewModel.isServerRunning.collectAsState()
 
     val totalItemCount = cart.sumOf { it.quantity }
 
@@ -157,6 +160,33 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    // 13D Main Server Badge
+                    Surface(
+                        onClick = { showServerDialog = true },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isServerRunning) Color(0xFFDCFCE7) else Color(0xFFFEE2E2),
+                        modifier = Modifier.padding(end = 4.dp).testTag("top_bar_server_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Wifi,
+                                contentDescription = "Server Status",
+                                tint = if (isServerRunning) Color(0xFF16A34A) else Color(0xFFDC2626),
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = if (isServerRunning) "📡 Server" else "📡 Off",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isServerRunning) Color(0xFF15803D) else Color(0xFFB91C1C)
+                            )
+                        }
+                    }
+
                     // Camera Barcode Scanner
                     IconButton(
                         onClick = { showScanner = true },
@@ -466,6 +496,16 @@ fun HomeScreen(
         ShiftReportDialog(
             viewModel = viewModel,
             onDismiss = { showShiftReport = false }
+        )
+    }
+
+    if (showServerDialog) {
+        ServerStatusDialog(
+            viewModel = viewModel,
+            onDismiss = { showServerDialog = false },
+            onOpenStaffClient = {
+                viewModel.setStaffClientMode(true)
+            }
         )
     }
 }
