@@ -37,12 +37,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import com.example.offlinepos.R
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -890,7 +893,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 14A Main Server & Direct HTML5 Web Portal
+            // 14B Main POS Server & Direct HTML5 Web Portal
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -898,7 +901,48 @@ fun SettingsScreen(
                 border = CardDefaults.outlinedCardBorder()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("🌐 Main Server နှင့် Direct HTML5 Web Portal စနစ်", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.Wifi,
+                                        contentDescription = "Main POS Server Logo",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text("🌐 Main POS Server (14B)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text("Direct HTML5 Web Portal စနစ်", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isServerRunning) Color(0xFFDCFCE7) else Color(0xFFFEE2E2),
+                        ) {
+                            Text(
+                                text = if (isServerRunning) "📡 Server ON" else "📡 Server OFF",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isServerRunning) Color(0xFF15803D) else Color(0xFFB91C1C),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text("ဖုန်းထဲတွင် App မသွင်းလိုသော ဝန်ထမ်းများအတွက် Chrome/Browser မှတစ်ဆင့် Server IP သို့ ဝင်ရောက်၍ ကုန်ပစ္စည်းလှမ်းထည့်သည့် စနစ်", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -1079,7 +1123,7 @@ fun SettingsScreen(
                     Text("စနစ် အချက်အလက်များ", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("• ဆိုင်: ${storeProfile.storeName}", style = MaterialTheme.typography.bodySmall)
-                    Text("• ဗားရှင်း: 14A (14A_787_AI_update.apk)", style = MaterialTheme.typography.bodySmall)
+                    Text("• ဗားရှင်း: 14B (14B_787_AI_update.apk)", style = MaterialTheme.typography.bodySmall)
                     Text("• Direct HTML5 Web Portal: Chrome/Browser မှတစ်ဆင့် ကုန်ပစ္စည်းထည့်သွင်းစနစ် ပါဝင်ပြီး", style = MaterialTheme.typography.bodySmall)
                     Text("• ဆာဗာ အဆင့်: Local Embedded HTTP REST & WebSocket (Port 8787)", style = MaterialTheme.typography.bodySmall)
                     Text("• ဆိုင်ဝန်ထမ်း Client စနစ်: client.apk နှင့် HTML5 Web App အပြည့်အစုံ", style = MaterialTheme.typography.bodySmall)

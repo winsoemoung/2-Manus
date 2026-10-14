@@ -12,13 +12,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.BufferedInputStream
 import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.URLDecoder
 import java.util.Collections
 
 data class RemoteProductDto(
@@ -105,43 +108,66 @@ class LocalPosServer(
 
     private suspend fun handleClientSocket(socket: Socket) = withContext(Dispatchers.IO) {
         try {
-            socket.soTimeout = 10000
-            val reader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
+            socket.soTimeout = 15000
+            val inputStream = BufferedInputStream(socket.getInputStream())
             val output = socket.getOutputStream()
 
-            val requestLine = reader.readLine() ?: run {
+            // Read HTTP headers safely as raw bytes until \r\n\r\n or \n\n
+            val headerStream = ByteArrayOutputStream()
+            var prev3 = -1
+            var prev2 = -1
+            var prev1 = -1
+            var b: Int
+            while (true) {
+                b = inputStream.read()
+                if (b == -1) break
+                headerStream.write(b)
+                if ((prev3 == '\r'.code && prev2 == '\n'.code && prev1 == '\r'.code && b == '\n'.code) ||
+                    (prev1 == '\n'.code && b == '\n'.code)
+                ) {
+                    break
+                }
+                prev3 = prev2
+                prev2 = prev1
+                prev1 = b
+            }
+
+            val headerText = headerStream.toString("UTF-8")
+            if (headerText.isBlank()) {
                 socket.close()
                 return@withContext
             }
 
+            val headerLines = headerText.lines()
+            val requestLine = headerLines.firstOrNull()?.trim() ?: ""
             val parts = requestLine.split(" ")
             if (parts.size < 2) {
                 socket.close()
                 return@withContext
             }
 
-            val method = parts[0].uppercase()
-            val fullPath = parts[1]
+            val method = parts[0].uppercase().trim()
+            val fullPath = parts[1].trim()
             val path = fullPath.substringBefore("?")
 
             var contentLength = 0
-            var line: String?
-            while (reader.readLine().also { line = it } != null) {
-                if (line.isNullOrEmpty()) break
-                if (line!!.startsWith("Content-Length:", ignoreCase = true)) {
-                    contentLength = line!!.substringAfter(":").trim().toIntOrNull() ?: 0
+            for (line in headerLines) {
+                if (line.startsWith("Content-Length:", ignoreCase = true)) {
+                    contentLength = line.substringAfter(":").trim().toIntOrNull() ?: 0
+                    break
                 }
             }
 
+            // Read EXACTLY contentLength bytes from the stream
             val body = if (contentLength > 0) {
-                val buffer = CharArray(contentLength)
+                val buffer = ByteArray(contentLength)
                 var totalRead = 0
                 while (totalRead < contentLength) {
-                    val read = reader.read(buffer, totalRead, contentLength - totalRead)
+                    val read = inputStream.read(buffer, totalRead, contentLength - totalRead)
                     if (read <= 0) break
                     totalRead += read
                 }
-                String(buffer, 0, totalRead)
+                String(buffer, 0, totalRead, Charsets.UTF_8)
             } else ""
 
             // Handle preflight OPTIONS
@@ -163,7 +189,7 @@ class LocalPosServer(
                     val products = onGetProducts()
                     val json = JSONObject().apply {
                         put("status", "online")
-                        put("serverName", "14A_787_AI_SERVER")
+                        put("serverName", "14B_787_AI_SERVER")
                         put("storeName", getStoreName())
                         put("productCount", products.size)
                         put("timestamp", System.currentTimeMillis())
@@ -199,40 +225,17 @@ class LocalPosServer(
                     sendResponse(output, 200, "application/json", array.toString())
                 }
 
-                // Add New Product from Staff Client
-                path == "/api/products" && method == "POST" -> {
+                // Add New Product from Staff Client or Chrome Browser Web Portal
+                (path == "/api/products" || path == "/api/add-product") && method == "POST" -> {
                     try {
-                        val json = JSONObject(body)
-                        val name = json.optString("name", "").trim()
-                        val category = json.optString("category", "အထွေထွေ").trim().ifBlank { "အထွေထွေ" }
-                        val sku = json.optString("sku", "").trim().ifBlank { "PROD-${System.currentTimeMillis() % 100000}" }
-                        val barcode = json.optString("barcode", "").trim().ifBlank { null }
-                        val sellPrice = json.optLong("sellPriceMinor", 0L)
-                        val costPrice = json.optLong("costPriceMinor", 0L)
-                        val stock = json.optLong("stockQuantity", 0L)
-                        val threshold = json.optLong("lowStockThreshold", 3L)
-                        val unit = json.optString("unitName", "ခု").trim().ifBlank { "ခု" }
-                        val staff = json.optString("staffName", "ဆိုင်ဝန်ထမ်း").trim().ifBlank { "ဆိုင်ဝန်ထမ်း" }
-
-                        if (name.isBlank()) {
+                        val dto = parseProductPayload(body)
+                        if (dto.name.isBlank()) {
                             val errJson = JSONObject().apply {
                                 put("success", false)
                                 put("message", "ကုန်ပစ္စည်း အမည် ထည့်သွင်းရန် လိုအပ်ပါသည်")
                             }
                             sendResponse(output, 400, "application/json", errJson.toString())
                         } else {
-                            val dto = RemoteProductDto(
-                                name = name,
-                                category = category,
-                                sku = sku,
-                                barcode = barcode,
-                                costPriceMinor = costPrice,
-                                sellPriceMinor = sellPrice,
-                                stockQuantity = stock,
-                                lowStockThreshold = threshold,
-                                unitName = unit,
-                                staffName = staff
-                            )
                             val (success, msg) = onProductReceived(dto)
 
                             synchronized(receivedLogs) {
@@ -240,10 +243,10 @@ class LocalPosServer(
                                     0,
                                     ReceivedProductLog(
                                         timestampMs = System.currentTimeMillis(),
-                                        productName = name,
-                                        staffName = staff,
-                                        quantity = stock,
-                                        sellPriceMinor = sellPrice,
+                                        productName = dto.name,
+                                        staffName = dto.staffName,
+                                        quantity = dto.stockQuantity,
+                                        sellPriceMinor = dto.sellPriceMinor,
                                         isSuccess = success
                                     )
                                 )
@@ -253,14 +256,15 @@ class LocalPosServer(
                             val resJson = JSONObject().apply {
                                 put("success", success)
                                 put("message", msg)
-                                put("productName", name)
+                                put("productName", dto.name)
                             }
                             sendResponse(output, if (success) 200 else 400, "application/json", resJson.toString())
                         }
                     } catch (e: Exception) {
+                        Log.e(tag, "Add product processing error: ${e.message}", e)
                         val errJson = JSONObject().apply {
                             put("success", false)
-                            put("message", "JSON Data အမှားဖြစ်နေပါသည်: ${e.message}")
+                            put("message", "အချက်အလက် ထည့်သွင်းမှု အမှားဖြစ်နေပါသည်: ${e.message}")
                         }
                         sendResponse(output, 400, "application/json", errJson.toString())
                     }
@@ -285,6 +289,69 @@ class LocalPosServer(
         }
     }
 
+    private fun parseProductPayload(body: String): RemoteProductDto {
+        val trimmed = body.trim()
+        return if (trimmed.startsWith("{")) {
+            val json = JSONObject(trimmed)
+            val name = json.optString("name", json.optString("productName", "")).trim()
+            val category = json.optString("category", "အထွေထွေ").trim().ifBlank { "အထွေထွေ" }
+            val sku = json.optString("sku", "").trim().ifBlank { "PROD-${System.currentTimeMillis() % 100000}" }
+            val barcode = json.optString("barcode", "").trim().ifBlank { null }
+            val sellPrice = if (json.has("sellPriceMinor")) json.optLong("sellPriceMinor") else json.optLong("sellPrice", 0L)
+            val costPrice = if (json.has("costPriceMinor")) json.optLong("costPriceMinor") else json.optLong("costPrice", 0L)
+            val stock = if (json.has("stockQuantity")) json.optLong("stockQuantity", 1L) else json.optLong("stock", 1L)
+            val threshold = if (json.has("lowStockThreshold")) json.optLong("lowStockThreshold", 3L) else json.optLong("threshold", 3L)
+            val unit = json.optString("unitName", json.optString("unit", "ခု")).trim().ifBlank { "ခု" }
+            val staff = json.optString("staffName", json.optString("staff", "ဆိုင်ဝန်ထမ်း")).trim().ifBlank { "ဆိုင်ဝန်ထမ်း" }
+
+            RemoteProductDto(
+                name = name,
+                category = category,
+                sku = sku,
+                barcode = barcode,
+                costPriceMinor = costPrice,
+                sellPriceMinor = sellPrice,
+                stockQuantity = stock,
+                lowStockThreshold = threshold,
+                unitName = unit,
+                staffName = staff
+            )
+        } else {
+            val params = mutableMapOf<String, String>()
+            trimmed.split("&").forEach { pair ->
+                val kv = pair.split("=", limit = 2)
+                if (kv.isNotEmpty()) {
+                    val key = URLDecoder.decode(kv[0], "UTF-8")
+                    val value = if (kv.size > 1) URLDecoder.decode(kv[1], "UTF-8") else ""
+                    params[key] = value
+                }
+            }
+            val name = (params["name"] ?: params["productName"] ?: "").trim()
+            val category = (params["category"] ?: "အထွေထွေ").trim().ifBlank { "အထွေထွေ" }
+            val sku = (params["sku"] ?: "").trim().ifBlank { "PROD-${System.currentTimeMillis() % 100000}" }
+            val barcode = (params["barcode"] ?: "").trim().ifBlank { null }
+            val sellPrice = (params["sellPriceMinor"] ?: params["sellPrice"] ?: "0").toLongOrNull() ?: 0L
+            val costPrice = (params["costPriceMinor"] ?: params["costPrice"] ?: "0").toLongOrNull() ?: 0L
+            val stock = (params["stockQuantity"] ?: params["stock"] ?: "1").toLongOrNull() ?: 1L
+            val threshold = (params["lowStockThreshold"] ?: params["threshold"] ?: "3").toLongOrNull() ?: 3L
+            val unit = (params["unitName"] ?: params["unit"] ?: "ခု").trim().ifBlank { "ခု" }
+            val staff = (params["staffName"] ?: params["staff"] ?: "ဆိုင်ဝန်ထမ်း").trim().ifBlank { "ဆိုင်ဝန်ထမ်း" }
+
+            RemoteProductDto(
+                name = name,
+                category = category,
+                sku = sku,
+                barcode = barcode,
+                costPriceMinor = costPrice,
+                sellPriceMinor = sellPrice,
+                stockQuantity = stock,
+                lowStockThreshold = threshold,
+                unitName = unit,
+                staffName = staff
+            )
+        }
+    }
+
     private fun sendResponse(output: OutputStream, statusCode: Int, contentType: String, content: String) {
         val bytes = content.toByteArray(Charsets.UTF_8)
         val statusText = when (statusCode) {
@@ -297,8 +364,9 @@ class LocalPosServer(
                 "Content-Type: $contentType; charset=utf-8\r\n" +
                 "Content-Length: ${bytes.size}\r\n" +
                 "Access-Control-Allow-Origin: *\r\n" +
-                "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n" +
-                "Access-Control-Allow-Headers: Content-Type, Authorization\r\n" +
+                "Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE\r\n" +
+                "Access-Control-Allow-Headers: *\r\n" +
+                "Access-Control-Max-Age: 86400\r\n" +
                 "Connection: close\r\n\r\n"
         output.write(header.toByteArray(Charsets.UTF_8))
         output.write(bytes)
@@ -346,7 +414,7 @@ class LocalPosServer(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>787 ဆိုင်ဝန်ထမ်း Web Portal (14A)</title>
+    <title>787 ဆိုင်ဝန်ထမ်း Web Portal (14B)</title>
     <style>
         :root {
             --primary: #0284c7;
@@ -398,8 +466,8 @@ class LocalPosServer(
 <body>
     <div class="header">
         <h1>📱 $store</h1>
-        <p>Direct HTML5 Web Portal (14A_787_AI)</p>
-        <span class="status-badge" id="serverStatusBadge">🟢 Main Server ချိတ်ဆက်ပြီး (14A)</span>
+        <p>Direct HTML5 Web Portal (14B_787_AI)</p>
+        <span class="status-badge" id="serverStatusBadge">🟢 14B Main Server ချိတ်ဆက်ပြီး</span>
     </div>
 
     <div id="alertSuccess" class="alert alert-success"></div>
@@ -565,22 +633,46 @@ class LocalPosServer(
             }
         }
 
-        function startBarcodeScanner() {
-            const scannerBox = document.getElementById('scannerBox');
-            const video = document.getElementById('scannerVideo');
-            scannerBox.style.display = 'block';
+        function playSuccessTone() {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) {
+                    const ctx = new AudioCtx();
+                    const osc = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    osc.connect(g);
+                    g.connect(ctx.destination);
+                    osc.frequency.setValueAtTime(880, ctx.currentTime);
+                    g.gain.setValueAtTime(0.2, ctx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.2);
+                }
+            } catch (e) {}
+        }
 
-            navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' }
-            }).then(function(stream) {
-                videoStream = stream;
-                video.srcObject = stream;
-                video.play();
-                requestAnimationFrame(scanVideoFrame);
-            }).catch(function(err) {
-                alert('ကင်မရာ ဖွင့်မရပါ: ' + err.message + '\nBarcode ကို စာသားဖြင့် တိုက်ရိုက် ရိုက်ထည့်နိုင်ပါသည်');
-                scannerBox.style.display = 'none';
-            });
+        function startBarcodeScanner() {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                const scannerBox = document.getElementById('scannerBox');
+                const video = document.getElementById('scannerVideo');
+                scannerBox.style.display = 'block';
+
+                navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                }).then(function(stream) {
+                    videoStream = stream;
+                    video.srcObject = stream;
+                    video.play();
+                    requestAnimationFrame(scanVideoFrame);
+                }).catch(function(err) {
+                    alert('ကင်မရာ ဖွင့်မရပါ: ' + err.message + '\nBarcode ကို အောက်ပါအကွက်တွင် တိုက်ရိုက် ရိုက်ထည့်နိုင်ပါသည်');
+                    scannerBox.style.display = 'none';
+                    document.getElementById('barcode').focus();
+                });
+            } else {
+                alert('သတိပေးချက်: ဖုန်း Chrome HTTP ချိတ်ဆက်မှုတွင် ကင်မရာကို တိုက်ရိုက်မဖွင့်နိုင်ပါက Barcode နံပါတ်ကို တိုက်ရိုက် ရိုက်ထည့်နိုင်ပါသည်');
+                document.getElementById('barcode').focus();
+            }
         }
 
         function scanVideoFrame() {
@@ -591,6 +683,7 @@ class LocalPosServer(
                     if (barcodes && barcodes.length > 0) {
                         document.getElementById('barcode').value = barcodes[0].rawValue;
                         stopBarcodeScanner();
+                        playSuccessTone();
                         if (navigator.vibrate) navigator.vibrate(80);
                         return;
                     }
@@ -641,6 +734,9 @@ class LocalPosServer(
                 });
                 const data = await res.json();
                 if (res.ok && data.success) {
+                    playSuccessTone();
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+
                     alertSuccess.innerText = '✅ ' + (data.message || 'Main Server သို့ အောင်မြင်စွာ ပေါင်းထည့်ပြီးပါပြီ');
                     alertSuccess.style.display = 'block';
 

@@ -152,7 +152,7 @@ fun HomeScreen(
                                 }
                             }
                             Text(
-                                text = actor.userId,
+                                text = if (actor.userId.contains("Cashier") || actor.userId.contains("အရောင်းတာဝန်ခံ")) "SanThit" else actor.userId,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -160,32 +160,6 @@ fun HomeScreen(
                     }
                 },
                 actions = {
-                    // 14A Main Server Badge
-                    Surface(
-                        onClick = { showServerDialog = true },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (isServerRunning) Color(0xFFDCFCE7) else Color(0xFFFEE2E2),
-                        modifier = Modifier.padding(end = 4.dp).testTag("top_bar_server_button")
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.Wifi,
-                                contentDescription = "Server Status",
-                                tint = if (isServerRunning) Color(0xFF16A34A) else Color(0xFFDC2626),
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text(
-                                text = if (isServerRunning) "📡 Server" else "📡 Off",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isServerRunning) Color(0xFF15803D) else Color(0xFFB91C1C)
-                            )
-                        }
-                    }
 
                     // Camera Barcode Scanner
                     IconButton(

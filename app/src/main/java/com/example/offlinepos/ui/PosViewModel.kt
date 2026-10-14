@@ -99,7 +99,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
         private set
 
     // Current cashier / actor
-    private val _actor = MutableStateFlow(Actor(userId = "အရောင်းတာဝန်ခံ (Cashier #1)", canApplyDiscount = false))
+    private val _actor = MutableStateFlow(Actor(userId = "SanThit", canApplyDiscount = false))
     val actor: StateFlow<Actor> = _actor.asStateFlow()
 
     // Products Flow
@@ -971,8 +971,8 @@ class PosViewModel(private val context: Context) : ViewModel() {
     }
 
     fun setCashierMode() {
-        _actor.value = Actor(userId = "အရောင်းတာဝန်ခံ (Cashier #1)", canApplyDiscount = false)
-        setBanner("အရောင်းတာဝန်ခံ စနစ်သို့ ပြောင်းလဲပြီးပါပြီ")
+        _actor.value = Actor(userId = "SanThit", canApplyDiscount = false)
+        setBanner("SanThit စနစ်သို့ ပြောင်းလဲပြီးပါပြီ")
     }
 
     fun checkout(
@@ -1102,8 +1102,8 @@ class PosViewModel(private val context: Context) : ViewModel() {
             }
             else -> {
                 _currentRole.value = "CASHIER"
-                _actor.value = Actor(userId = "အရောင်းတာဝန်ခံ (Cashier #1)", canApplyDiscount = false)
-                setBanner("အရောင်းတာဝန်ခံ (Cashier) စနစ်သို့ ပြောင်းလဲပြီးပါပြီ")
+                _actor.value = Actor(userId = "SanThit", canApplyDiscount = false)
+                setBanner("SanThit စနစ်သို့ ပြောင်းလဲပြီးပါပြီ")
                 true
             }
         }
@@ -1645,32 +1645,54 @@ class PosViewModel(private val context: Context) : ViewModel() {
     suspend fun insertRemoteProduct(dto: RemoteProductDto): Pair<Boolean, String> = withContext(Dispatchers.IO) {
         try {
             val now = System.currentTimeMillis()
-            // If barcode exists, update existing product
-            if (!dto.barcode.isNullOrBlank()) {
-                val existing = db.productDao().findByBarcode(dto.barcode)
+            val cleanName = dto.name.trim()
+            val cleanBarcode = dto.barcode?.trim()?.ifBlank { null }
+            val cleanSku = dto.sku.trim().ifBlank { "PROD-${System.currentTimeMillis() % 1000000}" }
+
+            // 1. If barcode exists, check if product already in database
+            if (!cleanBarcode.isNullOrBlank()) {
+                val existing = db.productDao().findByBarcode(cleanBarcode)
                 if (existing != null) {
                     val updated = existing.copy(
-                        name = dto.name.ifBlank { existing.name },
+                        name = if (cleanName.isNotBlank()) cleanName else existing.name,
                         sellPriceMinor = if (dto.sellPriceMinor > 0) dto.sellPriceMinor else existing.sellPriceMinor,
                         costPriceMinor = if (dto.costPriceMinor > 0) dto.costPriceMinor else existing.costPriceMinor,
                         stockQuantity = existing.stockQuantity + dto.stockQuantity,
                         updatedAtEpochMs = now,
-                        category = dto.category.ifBlank { existing.category }
+                        category = if (dto.category.isNotBlank() && dto.category != "အထွေထွေ") dto.category else existing.category
                     )
                     db.productDao().update(updated)
                     _serverReceivedCount.value = _serverReceivedCount.value + 1
                     withContext(Dispatchers.Main) {
-                        setBanner("📢 ဝန်ထမ်း (${dto.staffName}) မှ [${dto.name}] လက်ကျန် +${dto.stockQuantity} ကို ပေါင်းထည့်ပေးပို့လိုက်ပါပြီ")
+                        setBanner("📢 ဝန်ထမ်း (${dto.staffName}) မှ [${cleanName}] လက်ကျန် +${dto.stockQuantity} ကို ပေါင်းထည့်ပေးပို့လိုက်ပါပြီ")
                     }
-                    return@withContext Pair(true, "[${dto.name}] လက်ကျန်ကို +${dto.stockQuantity} ခုဖြင့် အောင်မြင်စွာ တိုးမြှင့်ပေါင်းထည့်ပြီးပါပြီ")
+                    return@withContext Pair(true, "[${cleanName}] လက်ကျန်ကို +${dto.stockQuantity} ခုဖြင့် အောင်မြင်စွာ တိုးမြှင့်ပေါင်းထည့်ပြီးပါပြီ")
                 }
             }
 
-            // Insert new product into Database
+            // 2. If same name exists, update stock
+            val existingByName = db.productDao().observeActive().first().find { it.name.trim().equals(cleanName, ignoreCase = true) }
+            if (existingByName != null) {
+                val updated = existingByName.copy(
+                    stockQuantity = existingByName.stockQuantity + dto.stockQuantity,
+                    sellPriceMinor = if (dto.sellPriceMinor > 0) dto.sellPriceMinor else existingByName.sellPriceMinor,
+                    costPriceMinor = if (dto.costPriceMinor > 0) dto.costPriceMinor else existingByName.costPriceMinor,
+                    updatedAtEpochMs = now,
+                    category = if (dto.category.isNotBlank() && dto.category != "အထွေထွေ") dto.category else existingByName.category
+                )
+                db.productDao().update(updated)
+                _serverReceivedCount.value = _serverReceivedCount.value + 1
+                withContext(Dispatchers.Main) {
+                    setBanner("📢 ဝန်ထမ်း (${dto.staffName}) မှ [${cleanName}] လက်ကျန် +${dto.stockQuantity} ကို ပေါင်းထည့်ပေးပို့လိုက်ပါပြီ")
+                }
+                return@withContext Pair(true, "[${cleanName}] လက်ကျန်ကို +${dto.stockQuantity} ခုဖြင့် အောင်မြင်စွာ တိုးမြှင့်ပေါင်းထည့်ပြီးပါပြီ")
+            }
+
+            // 3. Insert new product into Database
             val newEntity = ProductEntity(
-                name = dto.name,
-                sku = dto.sku.ifBlank { "PROD-${System.currentTimeMillis() % 100000}" },
-                barcode = dto.barcode?.ifBlank { null },
+                name = cleanName,
+                sku = cleanSku,
+                barcode = cleanBarcode,
                 costPriceMinor = dto.costPriceMinor,
                 sellPriceMinor = dto.sellPriceMinor,
                 stockQuantity = dto.stockQuantity,
@@ -1680,12 +1702,18 @@ class PosViewModel(private val context: Context) : ViewModel() {
                 unitName = dto.unitName.ifBlank { "ခု" },
                 updatedAtEpochMs = now,
             )
-            db.productDao().insert(newEntity)
+            try {
+                db.productDao().insert(newEntity)
+            } catch (e: Exception) {
+                // If unique constraint error occurs on barcode, insert with barcode null
+                android.util.Log.w("PosViewModel", "Barcode unique constraint fallback: ${e.message}")
+                db.productDao().insert(newEntity.copy(barcode = null))
+            }
             _serverReceivedCount.value = _serverReceivedCount.value + 1
             withContext(Dispatchers.Main) {
-                setBanner("📢 ဝန်ထမ်း (${dto.staffName}) မှ ကုန်ပစ္စည်းအသစ် [${dto.name}] (${dto.stockQuantity} ခု) ကို ပေါင်းထည့်ပေးပို့လိုက်ပါပြီ")
+                setBanner("📢 ဝန်ထမ်း (${dto.staffName}) မှ ကုန်ပစ္စည်းအသစ် [${cleanName}] (${dto.stockQuantity} ခု) ကို ပေါင်းထည့်ပေးပို့လိုက်ပါပြီ")
             }
-            Pair(true, "ကုန်ပစ္စည်း အသစ် [${dto.name}] ကို Database ထဲသို့ အောင်မြင်စွာ ပေါင်းထည့်ပြီးပါပြီ")
+            Pair(true, "ကုန်ပစ္စည်း အသစ် [${cleanName}] ကို Database ထဲသို့ အောင်မြင်စွာ ပေါင်းထည့်ပြီးပါပြီ")
         } catch (e: Exception) {
             Pair(false, e.message ?: "ထည့်သွင်းခြင်း မအောင်မြင်ပါ")
         }
