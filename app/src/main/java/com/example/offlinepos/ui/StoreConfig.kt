@@ -28,8 +28,10 @@ class StoreConfig(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("santhit_store_prefs", Context.MODE_PRIVATE)
 
     fun getProfile(): StoreProfile {
+        val rawStoreName = prefs.getString("store_name", "san thit") ?: "san thit"
+        val effectiveStoreName = if (rawStoreName.contains("ဆန်းသစ်") || rawStoreName.contains("ဆနးသစ်")) "san thit" else rawStoreName
         return StoreProfile(
-            storeName = prefs.getString("store_name", "ဆန်းသစ် အိမ်ဆောက်ပစ္စည်းဆိုင်") ?: "ဆန်းသစ် အိမ်ဆောက်ပစ္စည်းဆိုင်",
+            storeName = effectiveStoreName,
             address = prefs.getString("store_address", "အမှတ် (၁၂)၊ ဗိုလ်ချုပ်လမ်း၊ မြို့မရပ်ကွက်") ?: "အမှတ် (၁၂)၊ ဗိုလ်ချုပ်လမ်း၊ မြို့မရပ်ကွက်",
             phone = prefs.getString("store_phone", "၀၉-၄၅၀၀၁၂၃၄၅ ၊ ၀၉-၇၉၀၀၆၇၈၉၀") ?: "၀၉-၄၅၀၀၁၂၃၄၅ ၊ ၀၉-၇၉၀၀၆၇၈၉၀",
             headerNote = prefs.getString("store_header", "အိမ်ဆောက်ပစ္စည်း အမျိုးမျိုး လက်လီ/လက်ကား") ?: "အိမ်ဆောက်ပစ္စည်း အမျိုးမျိုး လက်လီ/လက်ကား",

@@ -536,7 +536,7 @@ fun SettingsScreen(
                                         val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                             type = "application/octet-stream"
                                             putExtra(Intent.EXTRA_STREAM, uri)
-                                            putExtra(Intent.EXTRA_SUBJECT, "ဆန်းသစ် POS ဒေတာ Backup")
+                                            putExtra(Intent.EXTRA_SUBJECT, "san thit POS ဒေတာ Backup")
                                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                         }
                                         context.startActivity(Intent.createChooser(shareIntent, "Google Drive သို့ Upload ရန် သို့မဟုတ် ဖိုင်သိမ်းရန်"))
@@ -893,7 +893,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 14B Main POS Server & Direct HTML5 Web Portal
+            // 14C Main POS Server & Direct HTML5 Web Portal
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -923,7 +923,7 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
-                                Text("🌐 Main POS Server (14B)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text("🌐 Main POS Server (14C)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                 Text("Direct HTML5 Web Portal စနစ်", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                             }
                         }
@@ -1123,7 +1123,7 @@ fun SettingsScreen(
                     Text("စနစ် အချက်အလက်များ", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("• ဆိုင်: ${storeProfile.storeName}", style = MaterialTheme.typography.bodySmall)
-                    Text("• ဗားရှင်း: 14B (14B_787_AI_update.apk)", style = MaterialTheme.typography.bodySmall)
+                    Text("• ဗားရှင်း: 14C (14C_787_AI_update.apk)", style = MaterialTheme.typography.bodySmall)
                     Text("• Direct HTML5 Web Portal: Chrome/Browser မှတစ်ဆင့် ကုန်ပစ္စည်းထည့်သွင်းစနစ် ပါဝင်ပြီး", style = MaterialTheme.typography.bodySmall)
                     Text("• ဆာဗာ အဆင့်: Local Embedded HTTP REST & WebSocket (Port 8787)", style = MaterialTheme.typography.bodySmall)
                     Text("• ဆိုင်ဝန်ထမ်း Client စနစ်: client.apk နှင့် HTML5 Web App အပြည့်အစုံ", style = MaterialTheme.typography.bodySmall)

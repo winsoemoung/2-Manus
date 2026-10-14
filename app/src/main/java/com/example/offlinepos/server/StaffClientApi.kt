@@ -48,7 +48,7 @@ object StaffClientApi {
                 val info = ServerStatusInfo(
                     status = json.optString("status", "online"),
                     serverName = json.optString("serverName", "787_POS_SERVER"),
-                    storeName = json.optString("storeName", "ဆန်းသစ် အိမ်ဆောက်ပစ္စည်းဆိုင်"),
+                    storeName = json.optString("storeName", "san thit"),
                     productCount = json.optInt("productCount", 0)
                 )
                 Result.success(info)
