@@ -163,7 +163,7 @@ class LocalPosServer(
                     val products = onGetProducts()
                     val json = JSONObject().apply {
                         put("status", "online")
-                        put("serverName", "13D_787_AI_SERVER")
+                        put("serverName", "14A_787_AI_SERVER")
                         put("storeName", getStoreName())
                         put("productCount", products.size)
                         put("timestamp", System.currentTimeMillis())
@@ -346,7 +346,7 @@ class LocalPosServer(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>787 ဆိုင်ဝန်ထမ်း ကုန်ပစ္စည်းထည့်စနစ်</title>
+    <title>787 ဆိုင်ဝန်ထမ်း Web Portal (14A)</title>
     <style>
         :root {
             --primary: #0284c7;
@@ -356,38 +356,50 @@ class LocalPosServer(
             --card: #ffffff;
             --text: #0f172a;
             --text-muted: #64748b;
-            --border: #e2e8f0;
+            --border: #cbd5e1;
+            --chip-bg: #e2e8f0;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Pyidaungsu", sans-serif; }
-        body { background: var(--bg); color: var(--text); padding: 14px; line-height: 1.5; }
-        .header { background: linear-gradient(135deg, #0284c7, #0f172a); color: white; padding: 16px; border-radius: 14px; margin-bottom: 16px; text-align: center; box-shadow: 0 4px 12px rgba(2,132,199,0.18); }
-        .header h1 { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
+        body { background: var(--bg); color: var(--text); padding: 12px; line-height: 1.5; max-width: 600px; margin: 0 auto; }
+        .header { background: linear-gradient(135deg, #0369a1, #0f172a); color: white; padding: 16px; border-radius: 14px; margin-bottom: 12px; text-align: center; box-shadow: 0 4px 12px rgba(2,132,199,0.2); }
+        .header h1 { font-size: 19px; font-weight: bold; margin-bottom: 4px; }
         .header p { font-size: 12px; opacity: 0.9; }
-        .status-badge { display: inline-block; background: #22c55e; color: white; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; margin-top: 6px; }
-        .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 16px; }
-        .card h2 { font-size: 15px; font-weight: bold; color: var(--primary-dark); margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+        .status-badge { display: inline-block; background: #22c55e; color: white; padding: 3px 12px; border-radius: 12px; font-size: 11px; font-weight: bold; margin-top: 8px; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 12px; }
+        .card h2 { font-size: 15px; font-weight: bold; color: var(--primary-dark); margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px; }
         .form-group { margin-bottom: 12px; }
         label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
-        input, select { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 14px; background: white; outline: none; transition: border-color 0.2s; }
+        input, select { width: 100%; min-height: 44px; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 14px; background: white; outline: none; transition: border-color 0.2s; }
         input:focus, select:focus { border-color: var(--primary); }
         .row { display: flex; gap: 8px; }
         .row .form-group { flex: 1; }
-        .btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        .btn { width: 100%; min-height: 48px; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .btn:hover { background: var(--primary-dark); }
         .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+        .btn-scan { background: #3b82f6; color: white; border: none; border-radius: 8px; padding: 0 12px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .chips-container { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; margin-bottom: 8px; }
+        .chip { background: var(--chip-bg); color: var(--text); padding: 4px 10px; border-radius: 14px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid #cbd5e1; }
+        .chip:hover { background: #bae6fd; color: #0369a1; }
+        .qty-btns { display: flex; gap: 6px; margin-top: 4px; }
+        .qty-btn { flex: 1; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center; }
+        .qty-btn:hover { background: #bae6fd; }
         .alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; display: none; font-weight: 600; }
         .alert-success { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
         .alert-error { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
-        .recent-item { padding: 10px; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+        .recent-item { padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
         .recent-item:last-child { border-bottom: none; }
         .badge { background: #e0f2fe; color: #0284c7; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
+        #scannerBox { display: none; margin-bottom: 12px; border-radius: 12px; overflow: hidden; position: relative; background: #000; }
+        #scannerVideo { width: 100%; height: 220px; object-fit: cover; }
+        .scanner-overlay { position: absolute; inset: 20% 15%; border: 2px dashed #22c55e; border-radius: 8px; pointer-events: none; }
+        .scanner-close { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>📱 $store</h1>
-        <p>ဆိုင်ဝန်ထမ်း ကုန်ပစ္စည်းအသစ် ထည့်သွင်းခြင်း စနစ်</p>
-        <span class="status-badge">🟢 Main Server ချိတ်ဆက်ပြီး (13D)</span>
+        <p>Direct HTML5 Web Portal (14A_787_AI)</p>
+        <span class="status-badge" id="serverStatusBadge">🟢 Main Server ချိတ်ဆက်ပြီး (14A)</span>
     </div>
 
     <div id="alertSuccess" class="alert alert-success"></div>
@@ -397,8 +409,8 @@ class LocalPosServer(
         <h2>📦 ကုန်ပစ္စည်းအသစ် ထည့်သွင်းရန်</h2>
         <form id="productForm">
             <div class="form-group">
-                <label>👤 ထည့်သွင်းသူ ဝန်ထမ်းအမည်</label>
-                <input type="text" id="staffName" value="ဆိုင်ဝန်ထမ်း #1" required placeholder="ဥပမာ - ကိုမင်း">
+                <label>👤 ထည့်သွင်းသူ ဝန်ထမ်းအမည် *</label>
+                <input type="text" id="staffName" required placeholder="ဥပမာ - ကိုမင်း / ဝန်ထမ်း ၁">
             </div>
 
             <div class="form-group">
@@ -408,23 +420,44 @@ class LocalPosServer(
 
             <div class="row">
                 <div class="form-group">
-                    <label>📂 အမျိုးအစား</label>
-                    <input type="text" id="category" value="အထွေထွေ" placeholder="ဥပမာ - ဘိလပ်မြေ">
+                    <label>📂 အမျိုးအစား (Category)</label>
+                    <input type="text" id="category" list="categoryDatalist" value="အထွေထွေ" placeholder="ရွေးချယ်ပါ သို့မဟုတ် ရိုက်ထည့်ပါ">
+                    <datalist id="categoryDatalist"></datalist>
                 </div>
                 <div class="form-group">
-                    <label>📦 ယူနစ်</label>
+                    <label>📦 ယူနစ် (Unit)</label>
                     <input type="text" id="unitName" value="ခု" placeholder="ခု / အိတ် / ထုပ်">
                 </div>
+            </div>
+
+            <div class="chips-container" id="categoryChips"></div>
+            <div class="chips-container">
+                <span class="chip" onclick="setUnit('ခု')">ခု</span>
+                <span class="chip" onclick="setUnit('အိတ်')">အိတ်</span>
+                <span class="chip" onclick="setUnit('ထုပ်')">ထုပ်</span>
+                <span class="chip" onclick="setUnit('ဘူး')">ဘူး</span>
+                <span class="chip" onclick="setUnit('ပေ')">ပေ</span>
+                <span class="chip" onclick="setUnit('ကီလို')">ကီလို</span>
+            </div>
+
+            <!-- Barcode Scanner Box -->
+            <div id="scannerBox">
+                <video id="scannerVideo" playsinline></video>
+                <div class="scanner-overlay"></div>
+                <button type="button" class="scanner-close" onclick="stopBarcodeScanner()">✕ ပိတ်မည်</button>
             </div>
 
             <div class="row">
                 <div class="form-group">
                     <label>🔢 SKU နံပါတ်</label>
-                    <input type="text" id="sku" placeholder="အလိုအလျောက် သတ်မှတ်မည်">
+                    <input type="text" id="sku" placeholder="အလိုအလျောက် ထုတ်ပေးမည်">
                 </div>
                 <div class="form-group">
                     <label>📷 Barcode နံပါတ်</label>
-                    <input type="text" id="barcode" placeholder="Barcode ရိုက်ထည့်ပါ">
+                    <div style="display:flex; gap:6px;">
+                        <input type="text" id="barcode" placeholder="Barcode ရိုက်ပါ">
+                        <button type="button" class="btn-scan" onclick="startBarcodeScanner()">📷 Scan</button>
+                    </div>
                 </div>
             </div>
 
@@ -443,6 +476,12 @@ class LocalPosServer(
                 <div class="form-group">
                     <label>📦 လက်ကျန် အရေအတွက် *</label>
                     <input type="number" id="stockQuantity" value="10" required placeholder="ဥပမာ - 50">
+                    <div class="qty-btns">
+                        <span class="qty-btn" onclick="addQty(1)">+1</span>
+                        <span class="qty-btn" onclick="addQty(5)">+5</span>
+                        <span class="qty-btn" onclick="addQty(10)">+10</span>
+                        <span class="qty-btn" onclick="addQty(50)">+50</span>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>⚠️ သတိပေး လက်ကျန်</label>
@@ -467,17 +506,122 @@ class LocalPosServer(
         const alertSuccess = document.getElementById('alertSuccess');
         const alertError = document.getElementById('alertError');
         const recentList = document.getElementById('recentList');
-        const addedItems = [];
+        const staffNameInput = document.getElementById('staffName');
+        const categoryDatalist = document.getElementById('categoryDatalist');
+        const categoryChips = document.getElementById('categoryChips');
+        let addedItems = [];
 
-        form.addEventListener('submit', async (e) => {
+        // Load saved staff name
+        const savedStaff = localStorage.getItem('787_staff_name');
+        if (savedStaff) {
+            staffNameInput.value = savedStaff;
+        } else {
+            staffNameInput.value = 'ဆိုင်ဝန်ထမ်း #1';
+        }
+
+        staffNameInput.addEventListener('change', function() {
+            localStorage.setItem('787_staff_name', staffNameInput.value.trim());
+        });
+
+        // Load categories on start
+        fetch('/api/categories')
+            .then(function(res) { return res.json(); })
+            .then(function(cats) {
+                if (Array.isArray(cats) && cats.length > 0) {
+                    categoryDatalist.innerHTML = cats.map(function(c) {
+                        return '<option value="' + c + '">';
+                    }).join('');
+
+                    categoryChips.innerHTML = cats.slice(0, 8).map(function(c) {
+                        return '<span class="chip" onclick="setCategory(\'' + c + '\')">' + c + '</span>';
+                    }).join('');
+                }
+            })
+            .catch(function(e) { console.log('Categories load error:', e); });
+
+        function setCategory(cat) {
+            document.getElementById('category').value = cat;
+        }
+
+        function setUnit(unit) {
+            document.getElementById('unitName').value = unit;
+        }
+
+        function addQty(n) {
+            const el = document.getElementById('stockQuantity');
+            el.value = (parseInt(el.value) || 0) + n;
+        }
+
+        // Camera Barcode Scanning using BarcodeDetector API
+        let videoStream = null;
+        let barcodeDetector = null;
+        if ('BarcodeDetector' in window) {
+            try {
+                barcodeDetector = new BarcodeDetector({
+                    formats: ['code_128', 'ean_13', 'ean_8', 'qr_code', 'upc_a', 'upc_e']
+                });
+            } catch (e) {
+                barcodeDetector = null;
+            }
+        }
+
+        function startBarcodeScanner() {
+            const scannerBox = document.getElementById('scannerBox');
+            const video = document.getElementById('scannerVideo');
+            scannerBox.style.display = 'block';
+
+            navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            }).then(function(stream) {
+                videoStream = stream;
+                video.srcObject = stream;
+                video.play();
+                requestAnimationFrame(scanVideoFrame);
+            }).catch(function(err) {
+                alert('ကင်မရာ ဖွင့်မရပါ: ' + err.message + '\nBarcode ကို စာသားဖြင့် တိုက်ရိုက် ရိုက်ထည့်နိုင်ပါသည်');
+                scannerBox.style.display = 'none';
+            });
+        }
+
+        function scanVideoFrame() {
+            if (!videoStream) return;
+            const video = document.getElementById('scannerVideo');
+            if (barcodeDetector && video.readyState === video.HAVE_ENOUGH_DATA) {
+                barcodeDetector.detect(video).then(function(barcodes) {
+                    if (barcodes && barcodes.length > 0) {
+                        document.getElementById('barcode').value = barcodes[0].rawValue;
+                        stopBarcodeScanner();
+                        if (navigator.vibrate) navigator.vibrate(80);
+                        return;
+                    }
+                    if (videoStream) requestAnimationFrame(scanVideoFrame);
+                }).catch(function() {
+                    if (videoStream) requestAnimationFrame(scanVideoFrame);
+                });
+            } else {
+                requestAnimationFrame(scanVideoFrame);
+            }
+        }
+
+        function stopBarcodeScanner() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(function(t) { t.stop(); });
+                videoStream = null;
+            }
+            document.getElementById('scannerBox').style.display = 'none';
+        }
+
+        form.addEventListener('submit', async function(e) {
             e.preventDefault();
             alertSuccess.style.display = 'none';
             alertError.style.display = 'none';
             submitBtn.disabled = true;
             submitBtn.innerText = 'ခေတ္တစောင့်ပါ...';
 
+            localStorage.setItem('787_staff_name', staffNameInput.value.trim());
+
             const payload = {
-                staffName: document.getElementById('staffName').value.trim(),
+                staffName: staffNameInput.value.trim() || 'ဆိုင်ဝန်ထမ်း #1',
                 name: document.getElementById('productName').value.trim(),
                 category: document.getElementById('category').value.trim() || 'အထွေထွေ',
                 unitName: document.getElementById('unitName').value.trim() || 'ခု',
@@ -508,7 +652,7 @@ class LocalPosServer(
                     });
                     renderRecent();
 
-                    // reset form
+                    // reset inputs
                     document.getElementById('productName').value = '';
                     document.getElementById('sku').value = '';
                     document.getElementById('barcode').value = '';

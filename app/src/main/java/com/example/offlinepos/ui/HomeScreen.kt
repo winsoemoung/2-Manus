@@ -160,7 +160,7 @@ fun HomeScreen(
                     }
                 },
                 actions = {
-                    // 13D Main Server Badge
+                    // 14A Main Server Badge
                     Surface(
                         onClick = { showServerDialog = true },
                         shape = RoundedCornerShape(12.dp),

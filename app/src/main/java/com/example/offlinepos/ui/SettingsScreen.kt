@@ -1,10 +1,16 @@
 package com.example.offlinepos.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.graphics.asImageBitmap
+import com.example.offlinepos.hardware.QrCodeHelper
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,9 +26,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
@@ -105,6 +112,12 @@ fun SettingsScreen(
     val serverIp by viewModel.serverIp.collectAsState()
     val receivedCount by viewModel.serverReceivedCount.collectAsState()
     var showServerDialog by remember { mutableStateOf(false) }
+
+    val serverQrBitmap = remember(serverUrl, isServerRunning) {
+        if (isServerRunning && serverUrl.isNotBlank()) {
+            QrCodeHelper.generateQrBitmap(serverUrl, 260)
+        } else null
+    }
 
     // Store profile editing states
     var storeName by remember(storeProfile) { mutableStateOf(storeProfile.storeName) }
@@ -877,7 +890,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 13D Main Server & Staff Client Network
+            // 14A Main Server & Direct HTML5 Web Portal
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -885,18 +898,18 @@ fun SettingsScreen(
                 border = CardDefaults.outlinedCardBorder()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("🌐 Main Server နှင့် ဆိုင်ဝန်ထမ်း Client စနစ်", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("Local Wi-Fi ကွန်ရက်အတွင်း ဝန်ထမ်းဖုန်းများမှ ကုန်ပစ္စည်းလှမ်းထည့်ခြင်း", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("🌐 Main Server နှင့် Direct HTML5 Web Portal စနစ်", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("ဖုန်းထဲတွင် App မသွင်းလိုသော ဝန်ထမ်းများအတွက် Chrome/Browser မှတစ်ဆင့် Server IP သို့ ဝင်ရောက်၍ ကုန်ပစ္စည်းလှမ်းထည့်သည့် စနစ်", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = if (isServerRunning) Color(0xFFDCFCE7) else Color(0xFFFEE2E2),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -904,15 +917,16 @@ fun SettingsScreen(
                                 Text(
                                     text = if (isServerRunning) "🟢 Server Online (လည်ပတ်နေပါသည်)" else "🔴 Server ရပ်တန့်ထားပါသည်",
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 12.5.sp,
+                                    fontSize = 13.sp,
                                     color = if (isServerRunning) Color(0xFF15803D) else Color(0xFFB91C1C)
                                 )
                                 if (isServerRunning) {
                                     Text(
-                                        text = "လိပ်စာ: $serverUrl",
-                                        fontSize = 11.sp,
+                                        text = "Web Portal: $serverUrl",
+                                        fontSize = 11.5.sp,
                                         color = Color(0xFF166534),
-                                        fontWeight = FontWeight.SemiBold
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
                                     )
                                     Text(
                                         text = "ဝန်ထမ်းများထံမှ လက်ခံရရှိမှု: $receivedCount ခု",
@@ -931,28 +945,123 @@ fun SettingsScreen(
                         }
                     }
 
+                    if (isServerRunning) {
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // URL Buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    cm.setPrimaryClip(ClipData.newPlainText("Server Web Portal URL", serverUrl))
+                                    Toast.makeText(context, "Web Portal လိပ်စာ ကူးယူပြီးပါပြီ:\n$serverUrl", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                            ) {
+                                Text("📋 Link ကူးယူမည်", fontSize = 11.5.sp)
+                            }
+
+                            Button(
+                                onClick = {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(serverUrl)).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Browser ဖွင့်မရပါ: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                            ) {
+                                Text("🌐 Web Portal ဖွင့်မည်", fontSize = 11.5.sp)
+                            }
+                        }
+
+                        // Direct QR Code display inside Settings
+                        serverQrBitmap?.let { qr ->
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text("📱 ဖုန်း Camera ဖြင့် Scan ဖတ်၍ Portal တိုက်ရိုက်ဖွင့်ရန် QR", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Image(
+                                        bitmap = qr.asImageBitmap(),
+                                        contentDescription = "Server QR Code",
+                                        modifier = Modifier
+                                            .size(160.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color.White)
+                                            .padding(6.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "Wi-Fi ကွန်ရက်တစ်ခုတည်းတွင် ဝန်ထမ်းဖုန်းဖြင့် Scan ဖတ်ပါက Chrome/Browser ဖြင့် Direct Web Portal သို့ စက္ကန့်ပိုင်းအတွင်း တိုက်ရိုက်ရောက်ရှိပါမည်",
+                                        fontSize = 10.5.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        lineHeight = 15.sp,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Features summary
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text("✨ Remote Product Addition အင်္ဂါရပ်များ:", fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("• ဝန်ထမ်းအမည် (Staff Name) ထည့်သွင်းခြင်း", fontSize = 10.5.sp)
+                                Text("• ကုန်ပစ္စည်းအမည်၊ အမျိုးအစား (Categories) ရွေးချယ်ခြင်း၊ ယူနစ်", fontSize = 10.5.sp)
+                                Text("• ကင်မရာဖြင့် Barcode Scan ဖတ်ခြင်း သို့မဟုတ် SKU ထည့်သွင်းခြင်း", fontSize = 10.5.sp)
+                                Text("• ရောင်းဈေး၊ ဝယ်ရင်းဈေး၊ လက်ကျန်အရေအတွက် နှင့် သတိပေးလက်ကျန် သတ်မှတ်ခြင်း", fontSize = 10.5.sp)
+                                Text("• ပေါင်းထည့်လိုက်သော ပစ္စည်းများ Database ထဲသို့ တိုက်ရိုက်ရောက်ရှိခြင်း", fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF15803D))
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(
+                        OutlinedButton(
                             onClick = { showServerDialog = true },
                             modifier = Modifier.weight(1f).testTag("open_server_status_btn"),
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                         ) {
-                            Text("📡 Server QR & အခြေအနေ", fontSize = 11.sp)
+                            Text("📡 Fullscreen QR & Status", fontSize = 11.sp)
                         }
 
-                        OutlinedButton(
+                        Button(
                             onClick = { viewModel.setStaffClientMode(true) },
                             modifier = Modifier.weight(1f).testTag("switch_to_client_mode_btn"),
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                         ) {
-                            Text("📱 ဝန်ထမ်း Client သို့", fontSize = 11.sp)
+                            Text("📱 ဝန်ထမ်း Client App သို့", fontSize = 11.sp)
                         }
                     }
                 }
@@ -970,7 +1079,8 @@ fun SettingsScreen(
                     Text("စနစ် အချက်အလက်များ", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("• ဆိုင်: ${storeProfile.storeName}", style = MaterialTheme.typography.bodySmall)
-                    Text("• ဗားရှင်း: 13D (13D_787_AI_update.apk)", style = MaterialTheme.typography.bodySmall)
+                    Text("• ဗားရှင်း: 14A (14A_787_AI_update.apk)", style = MaterialTheme.typography.bodySmall)
+                    Text("• Direct HTML5 Web Portal: Chrome/Browser မှတစ်ဆင့် ကုန်ပစ္စည်းထည့်သွင်းစနစ် ပါဝင်ပြီး", style = MaterialTheme.typography.bodySmall)
                     Text("• ဆာဗာ အဆင့်: Local Embedded HTTP REST & WebSocket (Port 8787)", style = MaterialTheme.typography.bodySmall)
                     Text("• ဆိုင်ဝန်ထမ်း Client စနစ်: client.apk နှင့် HTML5 Web App အပြည့်အစုံ", style = MaterialTheme.typography.bodySmall)
                     Text("• AI အဆင့်: Gemini 3.5 Flash Online + Superuser Local NLP Engine", style = MaterialTheme.typography.bodySmall)
