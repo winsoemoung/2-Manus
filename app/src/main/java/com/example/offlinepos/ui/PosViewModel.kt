@@ -541,11 +541,44 @@ class PosViewModel(private val context: Context) : ViewModel() {
 
         viewModelScope.launch {
             try {
+                // Calculate today's start epoch
+                val cal = java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }
+                val startOfDay = cal.timeInMillis
+                val allSales = salesHistory.value
+                val todaySales = allSales.filter { it.createdAtEpochMs >= startOfDay }
+                val todayRevenue = todaySales.sumOf { it.totalMinor }
+                val totalRevenue = allSales.sumOf { it.totalMinor }
+
+                val allProds = allProducts.value
+                val lowStockList = allProds.filter { it.stockQuantity <= it.lowStockThreshold }
+
+                val allCust = customers.value
+                val debtors = allCust.filter { it.currentDebtMinor > 0 }
+                val totalDebt = debtors.sumOf { it.currentDebtMinor }
+
+                val dbContext = com.example.offlinepos.ai.PosDatabaseContext(
+                    products = allProds,
+                    sales = allSales,
+                    customers = allCust,
+                    categories = categories.value,
+                    storeProfile = _storeProfile.value,
+                    totalRevenue = totalRevenue,
+                    todayRevenue = todayRevenue,
+                    todaySalesCount = todaySales.size,
+                    lowStockCount = lowStockList.size,
+                    lowStockProducts = lowStockList,
+                    debtors = debtors,
+                    totalDebtAmount = totalDebt,
+                )
+
                 val (responseText, action) = aiEngine.processUserCommand(
                     userPrompt = userPrompt,
-                    products = allProducts.value,
-                    sales = salesHistory.value,
-                    storeProfile = _storeProfile.value,
+                    dbContext = dbContext,
                 )
                 val aiMsg = AiChatMessage(
                     id = UUID.randomUUID().toString(),
@@ -1611,25 +1644,45 @@ class PosViewModel(private val context: Context) : ViewModel() {
 
     // Local POS Server Management
     fun startLocalServer() {
-        if (localServer == null) {
-            localServer = LocalPosServer(
-                context = context,
-                port = storeConfig.getServerPort(),
-                onProductReceived = { dto -> insertRemoteProduct(dto) },
-                onGetProducts = { db.productDao().observeActive().first() },
-                onGetCategories = { db.productDao().observeCategories().first() },
-                getStoreName = { storeProfile.value.storeName }
-            )
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (localServer == null) {
+                    localServer = LocalPosServer(
+                        context = context,
+                        port = storeConfig.getServerPort(),
+                        onProductReceived = { dto -> insertRemoteProduct(dto) },
+                        onGetProducts = { db.productDao().observeActive().first() },
+                        onGetCategories = { db.productDao().observeCategories().first() },
+                        getStoreName = { storeProfile.value.storeName }
+                    )
+                }
+                val started = localServer?.start() == true
+                _isServerRunning.value = started
+                if (started) {
+                    _serverIp.value = localServer?.getLocalIpAddress() ?: "127.0.0.1"
+                    _serverUrl.value = localServer?.getServerUrl() ?: ""
+                    setBanner("🟢 POS Server စတင်လည်ပတ်ပါပြီ (${_serverUrl.value})")
+                } else {
+                    setBanner("⚠️ Server ဖွင့်၍မရပါ (Port အလုပ်များနေနိုင်ပါသည်)")
+                }
+            } catch (e: Exception) {
+                _isServerRunning.value = false
+                setBanner("Server စတင်ရာတွင် အမှားဖြစ်ပေါ်ပါသည်: ${e.message}")
+            }
         }
-        localServer?.start()
-        _isServerRunning.value = localServer?.isRunning == true
-        _serverIp.value = localServer?.getLocalIpAddress() ?: "127.0.0.1"
-        _serverUrl.value = localServer?.getServerUrl() ?: ""
     }
 
     fun stopLocalServer() {
-        localServer?.stop()
-        _isServerRunning.value = false
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                localServer?.stop()
+                localServer = null // Critical: ensure clean recreation upon turning back ON
+                _isServerRunning.value = false
+                setBanner("🔴 Server ရပ်တန့်လိုက်ပါပြီ")
+            } catch (e: Exception) {
+                _isServerRunning.value = false
+            }
+        }
     }
 
     fun setStaffClientMode(isClient: Boolean) {

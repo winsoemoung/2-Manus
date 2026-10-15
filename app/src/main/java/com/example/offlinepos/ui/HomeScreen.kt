@@ -143,7 +143,7 @@ fun HomeScreen(
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = "အော့ဖ်လိုင်း",
+                                            text = "Offline",
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color(0xFF15803D),
@@ -228,7 +228,7 @@ fun HomeScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { viewModel.setSearchQuery(it) },
-                    placeholder = { Text("ပစ္စည်းအမည်၊ SKU သို့မဟုတ် Barcode ရှာရန်...") },
+                    placeholder = { Text("Name or SKU") },
                     leadingIcon = {
                         Icon(Icons.Default.Search, contentDescription = "Search")
                     },
@@ -286,70 +286,6 @@ fun HomeScreen(
                     .weight(1f)
                     .testTag("product_grid"),
             ) {
-                // Header Banner for San Thit Hardware
-                item(span = { GridItemSpan(2) }) {
-                    ElevatedCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(115.dp),
-                        shape = RoundedCornerShape(16.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(
-                                            Color(0xFF0F766E), // Deep Teal
-                                            Color(0xFF0284C7), // Sky Blue
-                                        )
-                                    )
-                                )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "🏗️ ${storeProfile.storeName}",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color.White,
-                                    )
-                                    Spacer(modifier = Modifier.height(3.dp))
-                                    Text(
-                                        text = "ဘိလပ်မြေ၊ သွပ်ပြား၊ သံချောင်း၊ ဆေး၊ ပိုက်",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFFE2E8F0),
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "✨ 787 AI ကွပ်ကဲရေး ပါဝင်သည် • Double Tap: အသေးစိတ်",
-                                        fontSize = 10.5.sp,
-                                        color = Color(0xFFFEF08A),
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                StoreLogoAvatar(
-                                    customLogoPath = storeProfile.customLogoPath,
-                                    contentDescription = "Store Owner Logo",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(76.dp)
-                                        .clip(CircleShape)
-                                        .border(2.dp, Color.White, CircleShape),
-                                )
-                            }
-                        }
-                    }
-                }
-
                 if (products.isEmpty()) {
                     item(span = { GridItemSpan(2) }) {
                         Box(

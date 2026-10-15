@@ -97,7 +97,7 @@ fun InventoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ပစ္စည်းစာရင်း စီမံခန့်ခွဲမှု (Inventory)", fontWeight = FontWeight.Bold) },
+                title = { Text("Inventory Management", fontWeight = FontWeight.Bold) },
                 actions = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -136,7 +136,7 @@ fun InventoryScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("ပစ္စည်းအမည်၊ SKU ဖြင့် ရှာဖွေရန်...") },
+                placeholder = { Text("Name or SKU") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
                 modifier = Modifier
                     .fillMaxWidth()

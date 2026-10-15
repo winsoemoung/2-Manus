@@ -1,5 +1,10 @@
 package com.example.offlinepos.ai
 
+import com.example.offlinepos.data.local.CustomerEntity
+import com.example.offlinepos.data.local.ProductEntity
+import com.example.offlinepos.data.local.SaleEntity
+import com.example.offlinepos.ui.StoreProfile
+
 enum class MessageSender {
     USER, AI
 }
@@ -109,4 +114,19 @@ data class AiChatMessage(
     val text: String,
     val timestampMs: Long,
     val action: AiAction? = null,
+)
+
+data class PosDatabaseContext(
+    val products: List<ProductEntity>,
+    val sales: List<SaleEntity>,
+    val customers: List<CustomerEntity> = emptyList(),
+    val categories: List<String> = emptyList(),
+    val storeProfile: StoreProfile,
+    val totalRevenue: Long = 0L,
+    val todayRevenue: Long = 0L,
+    val todaySalesCount: Int = 0,
+    val lowStockCount: Int = 0,
+    val lowStockProducts: List<ProductEntity> = emptyList(),
+    val debtors: List<CustomerEntity> = emptyList(),
+    val totalDebtAmount: Long = 0L,
 )

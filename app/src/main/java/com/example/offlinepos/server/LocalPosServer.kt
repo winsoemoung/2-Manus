@@ -18,6 +18,7 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.Inet4Address
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
@@ -64,33 +65,55 @@ class LocalPosServer(
 
     val receivedLogs = mutableListOf<ReceivedProductLog>()
 
-    fun start() {
-        if (isRunning) return
+    fun start(): Boolean {
+        if (isRunning && serverSocket != null && !serverSocket!!.isClosed) return true
+        isRunning = false
         try {
-            serverSocket = ServerSocket(port).apply {
-                reuseAddress = true
-            }
-            isRunning = true
-            Log.i(tag, "Local POS Server started on port $port")
+            serverSocket?.close()
+        } catch (_: Exception) {}
+        serverSocket = null
 
-            serverJob = scope.launch {
-                while (isActive && isRunning) {
-                    try {
-                        val socket = serverSocket?.accept() ?: break
-                        launch {
-                            handleClientSocket(socket)
-                        }
-                    } catch (e: Exception) {
-                        if (isRunning) {
-                            Log.e(tag, "Error accepting connection: ${e.message}")
-                        }
+        var success = false
+        // Retry binding up to 3 times with small backoff in case socket was just closed
+        for (attempt in 1..3) {
+            try {
+                val ss = ServerSocket()
+                ss.reuseAddress = true
+                ss.bind(InetSocketAddress(port))
+                serverSocket = ss
+                isRunning = true
+                success = true
+                Log.i(tag, "Local POS Server started successfully on port $port (attempt $attempt)")
+                break
+            } catch (e: Exception) {
+                Log.w(tag, "Bind attempt $attempt failed on port $port: ${e.message}")
+                if (attempt < 3) {
+                    try { Thread.sleep(200) } catch (_: Exception) {}
+                }
+            }
+        }
+
+        if (!success) {
+            isRunning = false
+            return false
+        }
+
+        serverJob?.cancel()
+        serverJob = scope.launch {
+            while (isActive && isRunning) {
+                try {
+                    val socket = serverSocket?.accept() ?: break
+                    launch {
+                        handleClientSocket(socket)
+                    }
+                } catch (e: Exception) {
+                    if (isRunning) {
+                        Log.e(tag, "Error accepting connection: ${e.message}")
                     }
                 }
             }
-        } catch (e: Exception) {
-            Log.e(tag, "Failed to start server: ${e.message}", e)
-            isRunning = false
         }
+        return true
     }
 
     fun stop() {
@@ -189,7 +212,7 @@ class LocalPosServer(
                     val products = onGetProducts()
                     val json = JSONObject().apply {
                         put("status", "online")
-                        put("serverName", "14C_787_AI_SERVER")
+                        put("serverName", "15A_787_AI_SERVER")
                         put("storeName", getStoreName())
                         put("productCount", products.size)
                         put("timestamp", System.currentTimeMillis())
@@ -414,7 +437,7 @@ class LocalPosServer(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>787 ဆိုင်ဝန်ထမ်း Web Portal (14C)</title>
+    <title>787 ဆိုင်ဝန်ထမ်း Web Portal (15A)</title>
     <style>
         :root {
             --primary: #0284c7;
@@ -466,8 +489,8 @@ class LocalPosServer(
 <body>
     <div class="header">
         <h1>📱 $store</h1>
-        <p>Direct HTML5 Web Portal (14C_787_AI)</p>
-        <span class="status-badge" id="serverStatusBadge">🟢 14C Main Server ချိတ်ဆက်ပြီး</span>
+        <p>Direct HTML5 Web Portal (15A_787_AI)</p>
+        <span class="status-badge" id="serverStatusBadge">🟢 15A Main Server ချိတ်ဆက်ပြီး</span>
     </div>
 
     <div id="alertSuccess" class="alert alert-success"></div>

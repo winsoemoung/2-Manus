@@ -47,15 +47,13 @@ class AiPosEngine(private val context: Context) {
 
     suspend fun processUserCommand(
         userPrompt: String,
-        products: List<ProductEntity>,
-        sales: List<SaleEntity>,
-        storeProfile: StoreProfile,
+        dbContext: PosDatabaseContext,
     ): Pair<String, AiAction?> = withContext(Dispatchers.IO) {
         val apiKey = getApiKey()
 
         if (apiKey.isNotBlank()) {
             try {
-                val result = callGeminiApi(apiKey, userPrompt, products, sales, storeProfile)
+                val result = callGeminiApi(apiKey, userPrompt, dbContext)
                 if (result != null) {
                     return@withContext result
                 }
@@ -64,16 +62,31 @@ class AiPosEngine(private val context: Context) {
             }
         }
 
-        // Offline Rule-based NLP Engine
-        processOfflineNlpCommand(userPrompt, products, sales, storeProfile)
+        // Offline POS Database Chatbot & NLP Engine
+        processOfflineNlpCommand(userPrompt, dbContext)
     }
 
-    private fun callGeminiApi(
-        apiKey: String,
+    suspend fun processUserCommand(
         userPrompt: String,
         products: List<ProductEntity>,
         sales: List<SaleEntity>,
         storeProfile: StoreProfile,
+    ): Pair<String, AiAction?> = processUserCommand(
+        userPrompt = userPrompt,
+        dbContext = PosDatabaseContext(
+            products = products,
+            sales = sales,
+            storeProfile = storeProfile,
+            totalRevenue = sales.sumOf { it.totalMinor },
+            lowStockCount = products.count { it.stockQuantity <= it.lowStockThreshold },
+            lowStockProducts = products.filter { it.stockQuantity <= it.lowStockThreshold }
+        )
+    )
+
+    private fun callGeminiApi(
+        apiKey: String,
+        userPrompt: String,
+        dbContext: PosDatabaseContext,
     ): Pair<String, AiAction?>? {
         val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$apiKey"
         val url = URL(endpoint)
@@ -86,30 +99,70 @@ class AiPosEngine(private val context: Context) {
             doInput = true
         }
 
-        // Build context summary
-        val catalogSummary = products.take(25).joinToString("\n") { p ->
-            "- ID:${p.productId}, Name:${p.name}, SKU:${p.sku}, Barcode:${p.barcode ?: "-"}, Sell:${p.sellPriceMinor}Ks, Cost:${p.costPriceMinor}Ks, Stock:${p.stockQuantity}, Cat:${p.category}"
+        val products = dbContext.products
+        val sales = dbContext.sales
+        val storeProfile = dbContext.storeProfile
+
+        // Build rich database context summary
+        val catalogSummary = products.take(35).joinToString("\n") { p ->
+            "- ID:${p.productId}, Name:${p.name}, SKU:${p.sku}, Barcode:${p.barcode ?: "-"}, Sell:${p.sellPriceMinor}Ks, Cost:${p.costPriceMinor}Ks, Stock:${p.stockQuantity} ${p.unitName}, Cat:${p.category}"
         }
+        val lowStockSummary = if (dbContext.lowStockProducts.isNotEmpty()) {
+            dbContext.lowStockProducts.take(15).joinToString("\n") { p ->
+                "• ${p.name} (SKU: ${p.sku}): လက်ကျန် ${p.stockQuantity} ${p.unitName} (သတိပေးလက်ကျန်: ${p.lowStockThreshold})"
+            }
+        } else "လက်ကျန်နည်းနေသော ပစ္စည်းမရှိပါ"
+
+        val debtorSummary = if (dbContext.debtors.isNotEmpty()) {
+            dbContext.debtors.take(10).joinToString("\n") { c ->
+                "• ${c.name} (${c.phone.ifBlank { "ဖုန်းမရှိ" }}): အကြွေးကျန် ${"%,d".format(c.currentDebtMinor)} Ks"
+            }
+        } else "လက်ရှိ အကြွေးကျန် Customer မရှိပါ"
+
         val promoSummary = storeConfig.getPromoCodes().joinToString(", ") { "${it.code} (${if (it.discountPercent > 0) "${it.discountPercent}%" else "${it.discountFlatMinor}Ks"})" }
-        val totalRevenue = sales.sumOf { it.totalMinor }
 
         val systemPrompt = """
-            You are the intelligent Executive AI Chief & Superuser Commander of '787 POS System' (Offline POS: ${storeProfile.storeName}).
-            You possess FULL SYSTEM PRIVILEGES (Superuser) to:
-            1. ADD NEW CODE: Add new products with SKU codes, barcodes, or add new promo/discount codes.
-            2. REPLACE CODE: Replace old SKU/barcode codes with new codes across the store catalog, batch replace code prefixes, or replace promo codes.
-            3. MODIFY CODE & DATA: Edit existing SKU/barcodes, modify prices, alter tax rates (0% to 100%), restock quantities, or execute direct SQL updates on the database.
+            You are the intelligent Gemini AI Chatbot directly connected to the SQLite POS Database of '787 POS' (Store: ${storeProfile.storeName}).
+            You have real-time access to the store's full database:
 
+            === LIVE POS DATABASE SNAPSHOT ===
             Store Details:
+            - Store Name: ${storeProfile.storeName}
             - Current Tax Rate: ${storeProfile.taxRatePercent}%.
-            - Total Products: ${products.size}.
-            - Total Sales Count: ${sales.size}, Total Sales Revenue: $totalRevenue Ks.
-            - Active Promo Codes: $promoSummary
-            - Sample Product Catalog:
-            $catalogSummary
+            - Active Categories: ${dbContext.categories.joinToString(", ").ifBlank { "ဘိလပ်မြေ, သွပ်ပြား, သံချောင်း, ဆေးသုတ်, ပိုက်နှင့်ဆက်စပ်" }}
 
-            Always answer courteously in Myanmar (Burmese) language.
-            When an actionable command is detected, write a concise explanation in Burmese AND append a valid JSON block enclosed in ```json and ``` at the end of your response:
+            Inventory Status:
+            - Total Products in Database: ${products.size}
+            - Low Stock Products Count: ${dbContext.lowStockCount}
+            - Low Stock Items:
+            $lowStockSummary
+
+            Sales & Financial Status:
+            - Total Lifetime Sales Orders: ${sales.size}
+            - Total Lifetime Revenue: ${"%,d".format(dbContext.totalRevenue)} Ks
+            - Today's Sales Count: ${dbContext.todaySalesCount} orders
+            - Today's Revenue: ${"%,d".format(dbContext.todayRevenue)} Ks
+
+            Customer Debt Ledger:
+            - Customers with Debt: ${dbContext.debtors.size}
+            - Total Outstanding Debt: ${"%,d".format(dbContext.totalDebtAmount)} Ks
+            - Top Debtors:
+            $debtorSummary
+
+            Active Promo Codes: $promoSummary
+
+            Sample Product Catalog:
+            $catalogSummary
+            ==================================
+
+            Your Capabilities:
+            1. ANSWER QUESTIONS ABOUT POS DATA: Answer any questions about stock levels, low-stock warnings, today's sales, total revenue, debtor customers, prices, profit margins, product details, or store statistics.
+            2. SUPERUSER ACTIONS: You have permission to add new products, update prices, modify SKUs/barcodes, adjust stock quantities, change tax rates, add promo codes, or run dynamic database scripts.
+
+            Guidance:
+            - Always respond courteously and clearly in Myanmar (Burmese) language.
+            - When answering questions about database data (e.g. sales, stock, debt), provide accurate numbers from the snapshot above.
+            - When the user asks you to perform an actionable command (e.g., add product, update price, adjust stock, replace code), write a concise explanation in Burmese AND append a valid JSON block enclosed in ```json and ``` at the end:
             ```json
             {
               "action": "ADD_PRODUCT" | "REPLACE_PRODUCT_CODE" | "UPDATE_SKU" | "UPDATE_BARCODE" | "BATCH_REPLACE_PREFIX" | "UPDATE_PRICE" | "ADJUST_STOCK" | "SET_TAX_RATE" | "ADD_PROMO_CODE" | "REPLACE_PROMO_CODE" | "EXECUTE_DYNAMIC_CODE" | "UPDATE_STORE_PROFILE" | "BATCH_REPLACE_CATEGORY",
@@ -137,7 +190,7 @@ class AiPosEngine(private val context: Context) {
             val contents = JSONArray().apply {
                 put(JSONObject().apply {
                     put("parts", JSONArray().apply {
-                        put(JSONObject().put("text", "$systemPrompt\n\nUser Command: $userPrompt"))
+                        put(JSONObject().put("text", "$systemPrompt\n\nUser Question/Command: $userPrompt"))
                     })
                 })
             }
@@ -322,10 +375,11 @@ class AiPosEngine(private val context: Context) {
 
     private fun processOfflineNlpCommand(
         prompt: String,
-        products: List<ProductEntity>,
-        sales: List<SaleEntity>,
-        storeProfile: StoreProfile,
+        dbContext: PosDatabaseContext,
     ): Pair<String, AiAction?> {
+        val products = dbContext.products
+        val sales = dbContext.sales
+        val storeProfile = dbContext.storeProfile
         val lower = prompt.lowercase()
 
         // 1. Promo Code Addition (e.g. "promo code ထည့်", "ကူပွန် code ထည့်", "code 787VIP ၁၀% ထည့်")
@@ -658,20 +712,136 @@ class AiPosEngine(private val context: Context) {
             )
         }
 
+        // 13. Debtor & Customer Credit Inquiry
+        if (lower.contains("အကြွေး") || lower.contains("debt") || lower.contains("customer") || lower.contains("ဖောက်သည်")) {
+            val debtors = dbContext.debtors
+            val totalDebt = dbContext.totalDebtAmount
+            if (debtors.isEmpty()) {
+                return Pair("✅ **787 AI ဒေတာဘေ့စ် စစ်ဆေးချက်:** လက်ရှိတွင် အကြွေးကျန်ရှိသော Customer / ဖောက်သည် မရှိပါ (Zero Debt)။", null)
+            }
+            val listStr = debtors.take(15).joinToString("\n") { c ->
+                "• ${c.name} (${if (c.phone.isNotBlank()) c.phone else "ဖုန်းမရှိ"}) -> အကြွေးကျန်: ${"%,d".format(c.currentDebtMinor)} Ks"
+            }
+            return Pair(
+                """
+                👥 **787 POS - အကြွေးကျန် Customer များ စာရင်း (Database):**
+                • စုစုပေါင်း အကြွေးကျန်ရှိသူ: ${debtors.size} ဦး
+                • စုစုပေါင်း ရရန်ရှိ အကြွေးငွေ: ${"%,d".format(totalDebt)} Ks
+                
+                အကြွေးကျန် အများဆုံး ဖောက်သည်များ:
+                $listStr
+                
+                💡 ဖောက်သည်များထံသို့ အကြွေးပြန်လည်တောင်းခံနိုင်ရန် သို့မဟုတ် Repayment ပြေစာသွင်းနိုင်ရန် Customer Debt Ledger တွင် စီမံခန့်ခွဲနိုင်ပါသည်။
+                """.trimIndent(),
+                null
+            )
+        }
+
+        // 14. Best-selling Products Inquiry
+        if (lower.contains("အရောင်းရဆုံး") || lower.contains("best selling") || lower.contains("ရောင်းအားကောင်း") || lower.contains("လူကြိုက်")) {
+            val topItems = products.sortedByDescending { it.sellPriceMinor }.take(5)
+            val listStr = topItems.mapIndexed { idx, p ->
+                "${idx + 1}။ ${p.name} (SKU: ${p.sku}) - ရောင်းဈေး: ${"%,d".format(p.sellPriceMinor)} Ks (လက်ကျန်: ${p.stockQuantity} ${p.unitName})"
+            }.joinToString("\n")
+            return Pair(
+                """
+                🏆 **787 POS - အရောင်းရဆုံးနှင့် ရောင်းအားအကောင်းဆုံး ကုန်ပစ္စည်းများ (Database):**
+                $listStr
+
+                💡 အဆိုပါ ပစ္စည်းများသည် ဆိုင်၏ အဓိက ဝင်ငွေရရှိစေသော အဓိက ကုန်ပစ္စည်းများဖြစ်သဖြင့် စတော့ပြတ်လပ်မှုမရှိစေရန် ကြိုတင်မှာယူထားသင့်ပါသည်။
+                """.trimIndent(),
+                null
+            )
+        }
+
+        // 15. Today's Sales Inquiry
+        if (lower.contains("ဒီနေ့") || lower.contains("ယနေ့") || lower.contains("today")) {
+            val formattedTodayRevenue = "%,d".format(dbContext.todayRevenue)
+            val count = dbContext.todaySalesCount
+            return Pair(
+                """
+                📈 **787 POS - ဒီနေ့ (Today) အရောင်းအချက်အလက် (Database):**
+                • ဒီနေ့ အော်ဒါအရေအတွက်: $count ခု
+                • ဒီနေ့ စုစုပေါင်း ရောင်းရငွေ: $formattedTodayRevenue Ks
+                • စနစ် အခြေအနေ: Local Offline POS ဒေတာဘေ့စ်နှင့် တိုက်ရိုက်ချိတ်ဆက်ပြီး
+                
+                💡 အသေးစိတ် ဘေလ်ဖြတ်ပိုင်းများကို အရောင်းမှတ်တမ်း (Sales History) တက်ဘ်တွင် စစ်ဆေးနိုင်ပါသည်။
+                """.trimIndent(),
+                null
+            )
+        }
+
+        // 16. Inventory & Stock Valuation Inquiry
+        if (lower.contains("စတော့") || lower.contains("ပစ္စည်းစာရင်း") || lower.contains("inventory") || lower.contains("လက်ကျန်အားလုံး")) {
+            val totalItems = products.size
+            val totalUnits = products.sumOf { it.stockQuantity }
+            val totalValuation = products.sumOf { it.costPriceMinor * it.stockQuantity }
+            val totalSellValuation = products.sumOf { it.sellPriceMinor * it.stockQuantity }
+            val formattedCostVal = "%,d".format(totalValuation)
+            val formattedSellVal = "%,d".format(totalSellValuation)
+            val lowCount = dbContext.lowStockCount
+            return Pair(
+                """
+                📦 **787 POS - စတော့နှင့် ကုန်ပစ္စည်းစာရင်း သုံးသပ်ချက် (Database):**
+                • စုစုပေါင်း ကုန်ပစ္စည်းအမျိုးအမည်: $totalItems မျိုး
+                • စုစုပေါင်း လက်ကျန်အရေအတွက်: $totalUnits ခု/လုံး
+                • လက်ကျန်နည်းနေသော ပစ္စည်း: $lowCount မျိုး
+                • စုစုပေါင်း ကုန်ပစ္စည်း အရင်းတန်ဖိုး (Cost Valuation): $formattedCostVal Ks
+                • ရောင်းချပါက ခန့်မှန်းရရှိမည့် တန်ဖိုး (Retail Valuation): $formattedSellVal Ks
+                • အမျိုးအစားများ: ${dbContext.categories.joinToString(", ")}
+                """.trimIndent(),
+                null
+            )
+        }
+
+        // 17. Specific Product Search by Name or SKU
+        val matchedProductForQuery = products.find { p ->
+            val cleanName = p.name.trim()
+            cleanName.isNotBlank() && (
+                prompt.contains(cleanName) ||
+                (cleanName.length >= 4 && prompt.contains(cleanName.take(4))) ||
+                (p.sku.isNotBlank() && prompt.contains(p.sku, ignoreCase = true)) ||
+                (!p.barcode.isNullOrBlank() && prompt.contains(p.barcode))
+            )
+        }
+        if (matchedProductForQuery != null && !lower.contains("ထည့်") && !lower.contains("ပြင်") && !lower.contains("အစားထိုး")) {
+            val p = matchedProductForQuery
+            val marginPercent = if (p.sellPriceMinor > 0) ((p.sellPriceMinor - p.costPriceMinor).toDouble() / p.sellPriceMinor * 100).toInt() else 0
+            val isLow = p.stockQuantity <= p.lowStockThreshold
+            val statusEmoji = if (isLow) "⚠️ လက်ကျန်နည်းနေပါသည်" else "✅ လက်ကျန်ပုံမှန်ရှိသည်"
+            return Pair(
+                """
+                🔍 **787 POS ဒေတာဘေ့စ် ရှာဖွေတွေ့ရှိချက်:**
+                • ပစ္စည်းအမည်: **${p.name}**
+                • SKU ကုဒ်: `${p.sku}` ${if (!p.barcode.isNullOrBlank()) "| Barcode: `${p.barcode}`" else ""}
+                • အမျိုးအစား: ${p.category} | ယူနစ်: ${p.unitName}
+                • လက်ကျန်အရေအတွက်: **${p.stockQuantity} ${p.unitName}** ($statusEmoji)
+                • ရောင်းဈေး: **${"%,d".format(p.sellPriceMinor)} Ks**
+                • ဝယ်ရင်းဈေး: ${"%,d".format(p.costPriceMinor)} Ks (အမြတ်: $marginPercent%)
+                • သတိပေးလက်ကျန်: ${p.lowStockThreshold} ${p.unitName}
+                
+                💡 စျေးနှုန်း သို့မဟုတ် စတော့လက်ကျန် ပြင်ဆင်လိုပါက "ဈေးနှုန်း ပြင်ပါ" သို့မဟုတ် "လက်ကျန် ထပ်ဖြည့်ပါ" ဟု အမိန့်ပေးနိုင်ပါသည်။
+                """.trimIndent(),
+                null
+            )
+        }
+
         // Default General Guidance
         return Pair(
             """
             မင်္ဂလာပါ! ကျွန်ုပ်သည် 787 POS ၏ AI ကွပ်ကဲရေးမှူး ဖြစ်ပါသည်။
-            စနစ်ထဲမှ Code အသစ် ထည့်ခြင်း၊ အစားထိုးခြင်း၊ ပြုပြင်ခြင်း အခွင့်အရေးများ အပြည့်အဝ ရရှိထားပါသည်။
+            စနစ်ထဲမှ POS Database (စတော့၊ အရောင်း၊ အကြွေး၊ ဈေးနှုန်း) များနှင့် တိုက်ရိုက်ချိတ်ဆက်ထားပါသည်။
 
-            အောက်ပါ command များကို စာရိုက်၍ အမိန့်ပေးခိုင်းစေနိုင်ပါသည်-
+            အောက်ပါ မေးခွန်းနှင့် command များကို စာရိုက်၍ မေးမြန်း/အမိန့်ပေးနိုင်ပါသည်-
+            • "📊 အရောင်းရဆုံး ပစ္စည်းများ"
+            • "⚠️ လက်ကျန်နည်းနေသော ပစ္စည်းများ"
+            • "💰 စုစုပေါင်း အရောင်းရငွေ ဘယ်လောက်လဲ"
+            • "📈 ဒီနေ့ အရောင်းစာရင်း ပြပါ"
+            • "👥 အကြွေးကျန် Customer စာရင်း ပြပါ"
+            • "📦 ဘိလပ်မြေ လက်ကျန် ဘယ်လောက်ရှိလဲ"
             • "Code အသစ် 787-CEM-01 ဖြင့် ဘိလပ်မြေ ၁၅,၀၀၀ စာရင်းထဲ ထည့်ပါ"
-            • "ဘိလပ်မြေ Code အဟောင်းကို '787-CEM-VIP' ဖြင့် အစားထိုးပါ"
-            • "Promo Code '787VIP' ၁၀% လျှော့စျေး ထည့်ပါ"
             • "သံချောင်း Code နှင့် ဈေးနှုန်းကို ၁၆,၀၀၀ ပြင်ပါ"
-            • "အခွန်နှုန်းကို ၀% သို့ ပြင်ဆင်ပါ" (သို့မဟုတ် ၇% သတ်မှတ်ပါ)
-            • "ပစ္စည်း Code အားလုံးကို 787- prefix ဖြင့် အစားထိုးပါ"
-            • "အရောင်းသုံးသပ်ချက် အစီရင်ခံစာ ထုတ်ပေးပါ"
+            • "Promo Code '787VIP' ၁၀% လျှော့စျေး ထည့်ပါ"
             """.trimIndent(),
             null
         )

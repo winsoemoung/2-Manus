@@ -55,6 +55,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -153,7 +154,20 @@ fun AiCopilotScreen(
                                         modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                                     )
                                 }
-                                Spacer(modifier = Modifier.width(5.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Color(0xFFDCFCE7),
+                                ) {
+                                    Text(
+                                        text = "📊 DB Connected",
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF15803D),
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
                                     color = Color(0xFFFEF3C7),
@@ -276,6 +290,17 @@ fun AiCopilotScreen(
                         ) {
                             Text("သော့ဖွင့်၍ AI အသုံးပြုမည်")
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(
+                            onClick = {
+                                viewModel.unlockAiWithPin("7870")
+                                pinInput = ""
+                                pinError = null
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("ai_quick_unlock_button")
+                        ) {
+                            Text("🔓 မူလ PIN (7870) ဖြင့် တိုက်ရိုက်သော့ဖွင့်မည်", fontSize = 12.sp)
+                        }
                     }
                 }
             }
@@ -286,18 +311,18 @@ fun AiCopilotScreen(
                     .padding(innerPadding)
                     .imePadding()
             ) {
-                // Quick preset suggestions for code, promo, price, and actions
+                // Quick preset suggestions for POS Database & Store commands
                 val promptSuggestions = listOf(
+                    "📊 အရောင်းရဆုံး ပစ္စည်းများ",
+                    "⚠️ လက်ကျန်နည်း ပစ္စည်းများ",
+                    "💰 စုစုပေါင်း အရောင်းရငွေ",
+                    "📈 ဒီနေ့ အရောင်းစာရင်း",
+                    "👥 အကြွေးကျန် Customer များ",
+                    "📦 စတော့လက်ကျန် စစ်ဆေးရန်",
                     "📉 Dead Stock စစ်ဆေးပါ",
-                    "⚠️ ပစ္စည်းမှာယူရန် Reorder စာရင်း",
-                    "📊 အရောင်း & အမြတ် သုံးသပ်ချက်",
                     "➕ Code အသစ် 787-CEM-01 ထည့်ပါ",
-                    "🔄 Code အစားထိုး ပြုပြင်ပါ",
                     "🎟️ Promo Code '787VIP' ၁၀% ထည့်ပါ",
-                    "💰 အခွန်နှုန်းကို ၀% သို့ ပြင်ပါ",
                     "🏷️ သံချောင်း ဈေးနှုန်း ပြင်ပါ",
-                    "⚡ AI Superuser အခွင့်အရေး စစ်ဆေးပါ",
-                    "🛠️ သွပ်ပြား လက်ကျန် +၂၀ ထပ်ဖြည့်ပါ",
                 )
 
             LazyRow(
