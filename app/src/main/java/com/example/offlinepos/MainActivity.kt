@@ -6,7 +6,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -117,45 +120,49 @@ fun MainApp(viewModel: PosViewModel) {
         }
     }
 
+    val isImeVisible = WindowInsets.isImeVisible
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            NavigationBar(modifier = Modifier.testTag("bottom_nav_bar")) {
-                NavigationBarItem(
-                    selected = selectedTab == PosTab.REGISTER,
-                    onClick = { selectedTab = PosTab.REGISTER },
-                    icon = { Icon(Icons.Default.Home, contentDescription = "အရောင်း") },
-                    label = { Text("အရောင်း") },
-                    modifier = Modifier.testTag("nav_register"),
-                )
-                NavigationBarItem(
-                    selected = selectedTab == PosTab.INVENTORY,
-                    onClick = { selectedTab = PosTab.INVENTORY },
-                    icon = { Icon(Icons.Default.Edit, contentDescription = "ပစ္စည်းစာရင်း") },
-                    label = { Text("ပစ္စည်းစာရင်း") },
-                    modifier = Modifier.testTag("nav_inventory"),
-                )
-                NavigationBarItem(
-                    selected = selectedTab == PosTab.SALES,
-                    onClick = { selectedTab = PosTab.SALES },
-                    icon = { Icon(Icons.Default.Star, contentDescription = "အရောင်းပြက္ခဒိန်") },
-                    label = { Text("အရောင်းပြက္ခဒိန်") },
-                    modifier = Modifier.testTag("nav_sales"),
-                )
-                NavigationBarItem(
-                    selected = selectedTab == PosTab.AI_COPILOT,
-                    onClick = { selectedTab = PosTab.AI_COPILOT },
-                    icon = { Icon(Icons.Default.AutoAwesome, contentDescription = "AI ကွပ်ကဲရေး") },
-                    label = { Text("AI ကွပ်ကဲရေး") },
-                    modifier = Modifier.testTag("nav_ai_copilot"),
-                )
-                NavigationBarItem(
-                    selected = selectedTab == PosTab.SETTINGS,
-                    onClick = { selectedTab = PosTab.SETTINGS },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = "ဆက်တင်") },
-                    label = { Text("ဆက်တင်") },
-                    modifier = Modifier.testTag("nav_settings"),
-                )
+            if (!isImeVisible) {
+                NavigationBar(modifier = Modifier.testTag("bottom_nav_bar")) {
+                    NavigationBarItem(
+                        selected = selectedTab == PosTab.REGISTER,
+                        onClick = { selectedTab = PosTab.REGISTER },
+                        icon = { Icon(Icons.Default.Home, contentDescription = "အရောင်း") },
+                        label = { Text("အရောင်း") },
+                        modifier = Modifier.testTag("nav_register"),
+                    )
+                    NavigationBarItem(
+                        selected = selectedTab == PosTab.INVENTORY,
+                        onClick = { selectedTab = PosTab.INVENTORY },
+                        icon = { Icon(Icons.Default.Edit, contentDescription = "ပစ္စည်းစာရင်း") },
+                        label = { Text("ပစ္စည်းစာရင်း") },
+                        modifier = Modifier.testTag("nav_inventory"),
+                    )
+                    NavigationBarItem(
+                        selected = selectedTab == PosTab.SALES,
+                        onClick = { selectedTab = PosTab.SALES },
+                        icon = { Icon(Icons.Default.Star, contentDescription = "အရောင်းပြက္ခဒိန်") },
+                        label = { Text("အရောင်းပြက္ခဒိန်") },
+                        modifier = Modifier.testTag("nav_sales"),
+                    )
+                    NavigationBarItem(
+                        selected = selectedTab == PosTab.AI_COPILOT,
+                        onClick = { selectedTab = PosTab.AI_COPILOT },
+                        icon = { Icon(Icons.Default.AutoAwesome, contentDescription = "AI ကွပ်ကဲရေး") },
+                        label = { Text("AI ကွပ်ကဲရေး") },
+                        modifier = Modifier.testTag("nav_ai_copilot"),
+                    )
+                    NavigationBarItem(
+                        selected = selectedTab == PosTab.SETTINGS,
+                        onClick = { selectedTab = PosTab.SETTINGS },
+                        icon = { Icon(Icons.Default.Settings, contentDescription = "ဆက်တင်") },
+                        label = { Text("ဆက်တင်") },
+                        modifier = Modifier.testTag("nav_settings"),
+                    )
+                }
             }
         }
     ) { innerPadding ->
@@ -163,6 +170,7 @@ fun MainApp(viewModel: PosViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
         ) {
             when (selectedTab) {
                 PosTab.REGISTER -> HomeScreen(

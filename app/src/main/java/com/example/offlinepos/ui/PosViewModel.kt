@@ -1177,7 +1177,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
     }
 
     // AI PIN lock state
-    private val _isAiUnlocked = MutableStateFlow(false)
+    private val _isAiUnlocked = MutableStateFlow(true)
     val isAiUnlocked: StateFlow<Boolean> = _isAiUnlocked.asStateFlow()
 
     fun unlockAiWithPin(pin: String): Boolean {

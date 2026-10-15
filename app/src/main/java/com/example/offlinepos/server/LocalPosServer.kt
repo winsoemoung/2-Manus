@@ -212,7 +212,7 @@ class LocalPosServer(
                     val products = onGetProducts()
                     val json = JSONObject().apply {
                         put("status", "online")
-                        put("serverName", "15A_787_AI_SERVER")
+                        put("serverName", "15B_787_AI_SERVER")
                         put("storeName", getStoreName())
                         put("productCount", products.size)
                         put("timestamp", System.currentTimeMillis())
@@ -437,7 +437,7 @@ class LocalPosServer(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>787 ဆိုင်ဝန်ထမ်း Web Portal (15A)</title>
+    <title>787 ဆိုင်ဝန်ထမ်း Web Portal (15B)</title>
     <style>
         :root {
             --primary: #0284c7;
@@ -456,6 +456,11 @@ class LocalPosServer(
         .header h1 { font-size: 19px; font-weight: bold; margin-bottom: 4px; }
         .header p { font-size: 12px; opacity: 0.9; }
         .status-badge { display: inline-block; background: #22c55e; color: white; padding: 3px 12px; border-radius: 12px; font-size: 11px; font-weight: bold; margin-top: 8px; }
+        .net-status-bar { display: flex; justify-content: center; gap: 14px; margin-top: 8px; font-size: 11px; }
+        .net-status-item { display: inline-flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 8px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .dot-green { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.8); }
+        .dot-blue { background: #38bdf8; box-shadow: 0 0 6px rgba(56,189,248,0.8); }
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 12px; }
         .card h2 { font-size: 15px; font-weight: bold; color: var(--primary-dark); margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px; }
         .form-group { margin-bottom: 12px; }
@@ -489,8 +494,12 @@ class LocalPosServer(
 <body>
     <div class="header">
         <h1>📱 $store</h1>
-        <p>Direct HTML5 Web Portal (15A_787_AI)</p>
-        <span class="status-badge" id="serverStatusBadge">🟢 15A Main Server ချိတ်ဆက်ပြီး</span>
+        <p>Direct HTML5 Web Portal (15B_787_AI)</p>
+        <span class="status-badge" id="serverStatusBadge">🟢 15B Main Server ချိတ်ဆက်ပြီး</span>
+        <div class="net-status-bar">
+            <span class="net-status-item"><span class="dot dot-green"></span> Server: Reachable</span>
+            <span class="net-status-item"><span class="dot dot-blue"></span> DB: Synced</span>
+        </div>
     </div>
 
     <div id="alertSuccess" class="alert alert-success"></div>

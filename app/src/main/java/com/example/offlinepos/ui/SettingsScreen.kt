@@ -40,6 +40,7 @@ import com.example.offlinepos.R
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -893,7 +894,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 15A Main POS Server & Direct HTML5 Web Portal
+            // 15B Main POS Server & Direct HTML5 Web Portal
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -923,7 +924,7 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
-                                Text("🌐 Main POS Server (15A)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text("🌐 Main POS Server (15B)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                 Text("Direct HTML5 Web Portal စနစ်", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                             }
                         }
@@ -950,7 +951,10 @@ fun SettingsScreen(
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = if (isServerRunning) Color(0xFFDCFCE7) else Color(0xFFFEE2E2),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            if (isServerRunning) viewModel.stopLocalServer() else viewModel.startLocalServer()
+                        }
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -959,7 +963,7 @@ fun SettingsScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (isServerRunning) "🟢 Server Online (လည်ပတ်နေပါသည်)" else "🔴 Server ရပ်တန့်ထားပါသည်",
+                                    text = if (isServerRunning) "🟢 Server Online (လည်ပတ်နေပါသည်)" else "🔴 Server ရပ်တန့်ထားပါသည် (နှိပ်၍ ပြန်ဖွင့်နိုင်သည်)",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp,
                                     color = if (isServerRunning) Color(0xFF15803D) else Color(0xFFB91C1C)
@@ -984,8 +988,21 @@ fun SettingsScreen(
                                 checked = isServerRunning,
                                 onCheckedChange = { start ->
                                     if (start) viewModel.startLocalServer() else viewModel.stopLocalServer()
-                                }
+                                },
+                                modifier = Modifier.testTag("server_toggle_switch")
                             )
+                        }
+                    }
+
+                    if (!isServerRunning) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = { viewModel.startLocalServer() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().testTag("start_server_button")
+                        ) {
+                            Text("▶️ Server စတင်ဖွင့်မည် (Turn Server ON)", fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
 
@@ -1123,7 +1140,7 @@ fun SettingsScreen(
                     Text("စနစ် အချက်အလက်များ", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("• ဆိုင်: ${storeProfile.storeName}", style = MaterialTheme.typography.bodySmall)
-                    Text("• ဗားရှင်း: 15A (15A_787_AI_update.apk)", style = MaterialTheme.typography.bodySmall)
+                    Text("• ဗားရှင်း: 15B (15B_787_AI_update.apk)", style = MaterialTheme.typography.bodySmall)
                     Text("• Direct HTML5 Web Portal: Chrome/Browser မှတစ်ဆင့် ကုန်ပစ္စည်းထည့်သွင်းစနစ် ပါဝင်ပြီး", style = MaterialTheme.typography.bodySmall)
                     Text("• ဆာဗာ အဆင့်: Local Embedded HTTP REST & WebSocket (Port 8787)", style = MaterialTheme.typography.bodySmall)
                     Text("• ဆိုင်ဝန်ထမ်း Client စနစ်: client.apk နှင့် HTML5 Web App အပြည့်အစုံ", style = MaterialTheme.typography.bodySmall)

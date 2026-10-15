@@ -28,16 +28,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -88,230 +92,160 @@ fun AiCopilotScreen(
     val messages by viewModel.aiMessages.collectAsState()
     val isThinking by viewModel.isAiThinking.collectAsState()
     val storeProfile by viewModel.storeProfile.collectAsState()
-    val isAiUnlocked by viewModel.isAiUnlocked.collectAsState()
+    val actor by viewModel.actor.collectAsState()
     var inputText by remember { mutableStateOf("") }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
-    var pinInput by remember { mutableStateOf("") }
-    var pinError by remember { mutableStateOf<String?>(null) }
-
     val listState = rememberLazyListState()
 
-    // Scroll to latest message
-    LaunchedEffect(messages.size, isThinking, inputText) {
+    // Scroll to latest message on new message or thinking state change
+    LaunchedEffect(messages.size, isThinking) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
     }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
+        ) {
+            // Top App Bar with Store logo, Store Name ("san thit"), "Offline" badge & user subtitle (matching HomeScreen!)
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(contentAlignment = Alignment.BottomEnd) {
-                            StoreLogoAvatar(
-                                customLogoPath = storeProfile.customLogoPath,
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                            )
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                modifier = Modifier.size(16.dp),
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Default.AutoAwesome,
-                                        contentDescription = "AI",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(11.dp)
-                                    )
-                                }
-                            }
-                        }
+                        StoreLogoAvatar(
+                            customLogoPath = storeProfile.customLogoPath,
+                            contentDescription = "Store Owner Logo",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                        )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text(
-                                text = "787 AI ကွပ်ကဲရေးစင်တာ",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                            )
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                val hasKey = viewModel.getGeminiApiKey().isNotBlank()
+                                Text(
+                                    text = storeProfile.storeName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                // Offline ready badge (matching HomeScreen)
                                 Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (hasKey) Color(0xFFDCFCE7) else Color(0xFFE0F2FE),
-                                ) {
-                                    Text(
-                                        text = if (hasKey) "✨ Gemini 3.5 Flash" else "⚡ Local AI Rule Engine",
-                                        fontSize = 9.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (hasKey) Color(0xFF15803D) else Color(0xFF0369A1),
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(12.dp),
                                     color = Color(0xFFDCFCE7),
+                                    modifier = Modifier.padding(2.dp),
                                 ) {
-                                    Text(
-                                        text = "📊 DB Connected",
-                                        fontSize = 9.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF15803D),
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = Color(0xFFFEF3C7),
-                                ) {
-                                    Text(
-                                        text = if (isAiUnlocked) "🛡️ UNLOCKED" else "🔒 PIN LOCKED",
-                                        fontSize = 9.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF92400E),
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                    )
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .background(Color(0xFF16A34A), CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Offline",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF15803D),
+                                        )
+                                    }
                                 }
                             }
+                            Text(
+                                text = if (actor.userId.contains("Cashier") || actor.userId.contains("အရောင်းတာဝန်ခံ")) "SanThit" else actor.userId,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                 },
                 actions = {
-                    if (isAiUnlocked) {
-                        IconButton(
-                            onClick = { viewModel.lockAi() },
-                            modifier = Modifier.testTag("lock_ai_button")
-                        ) {
-                            Icon(Icons.Default.Lock, contentDescription = "Lock AI")
-                        }
-                        IconButton(
-                            onClick = { viewModel.clearAiChat() },
-                            modifier = Modifier.testTag("clear_ai_chat_button")
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Clear Chat")
-                        }
-                        IconButton(
-                            onClick = { showSettingsDialog = true },
-                            modifier = Modifier.testTag("ai_settings_button")
-                        ) {
-                            Icon(Icons.Default.Settings, contentDescription = "AI Settings")
-                        }
+                    IconButton(
+                        onClick = { viewModel.clearAiChat() },
+                        modifier = Modifier.testTag("clear_ai_chat_button")
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = "Clear Chat")
+                    }
+                    IconButton(
+                        onClick = { showSettingsDialog = true },
+                        modifier = Modifier.testTag("ai_settings_button")
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = "AI Settings")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                 )
             )
-        }
-    ) { innerPadding ->
-        if (!isAiUnlocked) {
-            // PIN Protection Screen
-            Box(
+
+            // Search / Command Bar & Dynamic Category Chips (matching HomeScreen layout!)
+            Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .imePadding()
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center,
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
             ) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("ai_pin_lock_card"),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = CardDefaults.outlinedCardBorder(),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.size(64.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
+                OutlinedTextField(
+                    value = inputText,
+                    onValueChange = { inputText = it },
+                    placeholder = { Text("Name or SKU") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary)
+                    },
+                    trailingIcon = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (inputText.isNotEmpty()) {
+                                IconButton(onClick = { inputText = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Clear")
+                                }
+                            }
+                            IconButton(
+                                onClick = {
+                                    if (inputText.isNotBlank()) {
+                                        viewModel.sendAiCommand(inputText)
+                                        inputText = ""
+                                    }
+                                },
+                                enabled = inputText.isNotBlank() && !isThinking,
+                                modifier = Modifier.testTag("ai_send_button")
+                            ) {
                                 Icon(
-                                    Icons.Default.Lock,
-                                    contentDescription = "Lock",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(32.dp)
+                                    Icons.Default.Send,
+                                    contentDescription = "Send",
+                                    tint = if (inputText.isNotBlank() && !isThinking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "AI ကွပ်ကဲရေးစင်တာ (PIN သော့ခတ်ထားပါသည်)",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "AI စနစ်ကို အသုံးပြုခွင့်ရရှိရန် ဆိုင်ရှင် သို့မဟုတ် မန်နေဂျာ PIN ရိုက်ထည့်ပါ",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        OutlinedTextField(
-                            value = pinInput,
-                            onValueChange = { pinInput = it },
-                            label = { Text("၄ လုံး PIN") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                            visualTransformation = PasswordVisualTransformation(),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth().testTag("ai_pin_input"),
-                        )
-                        pinError?.let {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("search_input"),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = {
+                        if (inputText.isNotBlank()) {
+                            viewModel.sendAiCommand(inputText)
+                            inputText = ""
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = {
-                                if (viewModel.unlockAiWithPin(pinInput)) {
-                                    pinInput = ""
-                                    pinError = null
-                                } else {
-                                    pinError = "PIN မှားယွင်းနေပါသည်။"
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth().height(48.dp).testTag("ai_unlock_button"),
-                        ) {
-                            Text("သော့ဖွင့်၍ AI အသုံးပြုမည်")
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        TextButton(
-                            onClick = {
-                                viewModel.unlockAiWithPin("7870")
-                                pinInput = ""
-                                pinError = null
-                            },
-                            modifier = Modifier.fillMaxWidth().testTag("ai_quick_unlock_button")
-                        ) {
-                            Text("🔓 မူလ PIN (7870) ဖြင့် တိုက်ရိုက်သော့ဖွင့်မည်", fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .imePadding()
-            ) {
-                // Quick preset suggestions for POS Database & Store commands
+                    })
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Dynamic Category / Suggestion Chips
                 val promptSuggestions = listOf(
                     "📊 အရောင်းရဆုံး ပစ္စည်းများ",
                     "⚠️ လက်ကျန်နည်း ပစ္စည်းများ",
@@ -325,39 +259,63 @@ fun AiCopilotScreen(
                     "🏷️ သံချောင်း ဈေးနှုန်း ပြင်ပါ",
                 )
 
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(promptSuggestions) { prompt ->
-                    FilterChip(
-                        selected = false,
-                        onClick = {
-                            viewModel.sendAiCommand(prompt)
-                        },
-                        label = { Text(prompt, fontSize = 11.5.sp) },
-                    )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(promptSuggestions) { prompt ->
+                        FilterChip(
+                            selected = false,
+                            onClick = { viewModel.sendAiCommand(prompt) },
+                            label = { Text(prompt, fontSize = 12.sp) },
+                            modifier = Modifier.testTag("category_chip_$prompt"),
+                        )
+                    }
                 }
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-            // Messages List
+            // Chat Message Stream
             LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(messages, key = { it.id }) { msg ->
-                    ChatMessageItem(
-                        message = msg,
-                        onExecuteAction = { action ->
-                            viewModel.executeAiAction(action)
+                if (messages.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 40.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("🤖", fontSize = 40.sp)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "787 AI ကွပ်ကဲရေး ချိတ်ဆက်ပြီးပါပြီ",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "အထက်ပါ Search bar တွင် စာရိုက်၍လည်းကောင်း၊ Chip များကိုနှိပ်၍လည်းကောင်း မေးမြန်းနိုင်ပါသည်",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
-                    )
+                    }
+                } else {
+                    items(messages, key = { it.id }) { msg ->
+                        ChatMessageItem(
+                            message = msg,
+                            onExecuteAction = { action ->
+                                viewModel.executeAiAction(action)
+                            }
+                        )
+                    }
                 }
 
                 if (isThinking) {
@@ -381,87 +339,14 @@ fun AiCopilotScreen(
                     }
                 }
             }
-
-            // Input Bar
-            Surface(
-                tonalElevation = 3.dp,
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = inputText,
-                        onValueChange = { inputText = it },
-                        placeholder = {
-                            Text("AI ထံ အမိန့်ရိုက်ထည့်ပါ (ဥပမာ - Code အသစ် 787-CEM ထည့်ပါ)...", fontSize = 12.sp)
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("ai_input_field"),
-                        shape = RoundedCornerShape(24.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                        keyboardActions = KeyboardActions(onSend = {
-                            if (inputText.isNotBlank()) {
-                                viewModel.sendAiCommand(inputText)
-                                inputText = ""
-                            }
-                        }),
-                        trailingIcon = {
-                            if (inputText.isNotEmpty()) {
-                                IconButton(onClick = { inputText = "" }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Clear")
-                                }
-                            }
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surface,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    IconButton(
-                        onClick = {
-                            if (inputText.isNotBlank()) {
-                                viewModel.sendAiCommand(inputText)
-                                inputText = ""
-                            }
-                        },
-                        enabled = inputText.isNotBlank() && !isThinking,
-                        modifier = Modifier
-                            .size(46.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (inputText.isNotBlank() && !isThinking) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.surfaceVariant
-                            )
-                            .testTag("ai_send_button")
-                    ) {
-                        Icon(
-                            Icons.Default.Send,
-                            contentDescription = "Send",
-                            tint = if (inputText.isNotBlank() && !isThinking) MaterialTheme.colorScheme.onPrimary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
         }
-    }
-}
 
-    if (showSettingsDialog) {
-        AiSettingsDialog(
-            viewModel = viewModel,
-            onDismiss = { showSettingsDialog = false }
-        )
+        if (showSettingsDialog) {
+            AiSettingsDialog(
+                viewModel = viewModel,
+                onDismiss = { showSettingsDialog = false }
+            )
+        }
     }
 }
 
