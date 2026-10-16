@@ -1294,6 +1294,21 @@ class PosViewModel(private val context: Context) : ViewModel() {
 
     fun getCustomerTransactions(customerId: Long) = db.customerDao().observeTransactionsForCustomer(customerId)
 
+    fun deleteCustomer(customerId: Long, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                db.customerDao().deleteCustomer(customerId)
+                withContext(Dispatchers.Main) {
+                    onResult(true, "ဝယ်သူအချက်အလက်ကို အောင်မြင်စွာ ဖျက်ပစ်ပြီးပါပြီ")
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onResult(false, "ဖျက်ပစ်ခြင်း မအောင်မြင်ပါ: ${e.message}")
+                }
+            }
+        }
+    }
+
     // Hold / Park Orders
     fun parkCurrentCart(tag: String) {
         val currentList = _cart.value
@@ -1551,6 +1566,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
                     isRoofingSheet = draft.isRoofingSheet,
                     lowStockThreshold = draft.lowStockThreshold,
                     imageUri = draft.imageUri,
+                    unitName = draft.unitName.ifBlank { "ခု" },
                     updatedAtEpochMs = now,
                 )
                 db.productDao().insert(newEntity)
@@ -1731,7 +1747,8 @@ class PosViewModel(private val context: Context) : ViewModel() {
                     sellPriceMinor = if (dto.sellPriceMinor > 0) dto.sellPriceMinor else existingByName.sellPriceMinor,
                     costPriceMinor = if (dto.costPriceMinor > 0) dto.costPriceMinor else existingByName.costPriceMinor,
                     updatedAtEpochMs = now,
-                    category = if (dto.category.isNotBlank() && dto.category != "အထွေထွေ") dto.category else existingByName.category
+                    category = if (dto.category.isNotBlank() && dto.category != "အထွေထွေ") dto.category else existingByName.category,
+                    imageUri = dto.imageUri ?: existingByName.imageUri,
                 )
                 db.productDao().update(updated)
                 _serverReceivedCount.value = _serverReceivedCount.value + 1
@@ -1753,6 +1770,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
                 isRoofingSheet = false,
                 lowStockThreshold = dto.lowStockThreshold,
                 unitName = dto.unitName.ifBlank { "ခု" },
+                imageUri = dto.imageUri,
                 updatedAtEpochMs = now,
             )
             try {

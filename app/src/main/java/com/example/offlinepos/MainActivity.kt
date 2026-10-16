@@ -264,6 +264,7 @@ fun MainApp(viewModel: PosViewModel) {
             onAddToCart = { viewModel.addToCart(product) },
             onAdjustStock = { qty -> viewModel.adjustStock(product.productId, qty) },
             onUpdateProduct = { updated -> viewModel.updateProduct(updated) },
+            onSaveImage = { uri -> viewModel.saveImageFromGalleryUri(uri) },
         )
     }
 

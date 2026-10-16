@@ -85,6 +85,8 @@ fun CartSheet(
     var quantityEditItem by remember { mutableStateOf<CartItem?>(null) }
     var quantityInput by remember { mutableStateOf("") }
     var promoCodeInput by remember { mutableStateOf("") }
+    var showClearConfirm by remember { mutableStateOf(false) }
+    var itemToRemove by remember { mutableStateOf<CartItem?>(null) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -131,7 +133,7 @@ fun CartSheet(
                     Row {
                         if (items.isNotEmpty()) {
                             TextButton(
-                                onClick = onClearCart,
+                                onClick = { showClearConfirm = true },
                                 modifier = Modifier.testTag("clear_cart_button"),
                             ) {
                                 Text("Clear", color = MaterialTheme.colorScheme.error)
@@ -183,8 +185,14 @@ fun CartSheet(
                             CartItemRow(
                                 item = item,
                                 canApplyDiscount = canApplyDiscount,
-                                onQuantityChange = { qty -> onQuantityChange(item.productId, qty) },
-                                onRemove = { onRemoveItem(item.productId) },
+                                onQuantityChange = { qty ->
+                                    if (qty <= 0) {
+                                        itemToRemove = item
+                                    } else {
+                                        onQuantityChange(item.productId, qty)
+                                    }
+                                },
+                                onRemove = { itemToRemove = item },
                                 onDirectQuantityClick = {
                                     quantityEditItem = item
                                     quantityInput = item.quantity.toString()
@@ -447,6 +455,36 @@ fun CartSheet(
                     Text("မလုပ်တော့ပါ")
                 }
             }
+        )
+    }
+
+    // Confirmation dialog for clearing cart
+    if (showClearConfirm) {
+        ConfirmDeleteDialog(
+            title = "🗑️ စျေးဝယ်ခြင်း အားလုံးကို ဖျက်မည်",
+            message = "လက်ရှိ ခြင်းတောင်းထဲရှိ ကုန်ပစ္စည်း အားလုံး (${items.size} မျိုး) ကို ဖျက်ပစ်ရန် သေချာပါသလား?",
+            confirmText = "ဖျက်မည်",
+            cancelText = "မလုပ်တော့ပါ",
+            onConfirm = {
+                onClearCart()
+                showClearConfirm = false
+            },
+            onDismiss = { showClearConfirm = false }
+        )
+    }
+
+    // Confirmation dialog for removing a single item from cart
+    itemToRemove?.let { item ->
+        ConfirmDeleteDialog(
+            title = "🗑️ ကုန်ပစ္စည်း ဖယ်ရှားမည်",
+            message = "စျေးဝယ်ခြင်းမှ [${item.name}] ကို ဖယ်ရှားရန် သေချာပါသလား?",
+            confirmText = "ဖယ်ရှားမည်",
+            cancelText = "မလုပ်တော့ပါ",
+            onConfirm = {
+                onRemoveItem(item.productId)
+                itemToRemove = null
+            },
+            onDismiss = { itemToRemove = null }
         )
     }
 }

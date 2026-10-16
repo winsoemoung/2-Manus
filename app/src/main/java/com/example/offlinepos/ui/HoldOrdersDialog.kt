@@ -57,6 +57,7 @@ fun HoldOrdersDialog(
 
     var showParkCurrentPrompt by remember { mutableStateOf(false) }
     var parkTagInput by remember { mutableStateOf("") }
+    var orderToDelete by remember { mutableStateOf<com.example.offlinepos.data.local.ParkedOrderEntity?>(null) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -186,7 +187,7 @@ fun HoldOrdersDialog(
 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         IconButton(
-                                            onClick = { viewModel.deleteParkedOrder(order.parkId) }
+                                            onClick = { orderToDelete = order }
                                         ) {
                                             Icon(
                                                 Icons.Default.Delete,
@@ -265,5 +266,20 @@ fun HoldOrdersDialog(
                 }
             }
         }
+    }
+
+    // Confirm Delete Dialog for Parked Order
+    orderToDelete?.let { order ->
+        ConfirmDeleteDialog(
+            title = "🗑️ ဆိုင်းငံ့အော်ဒါ ဖျက်မည်",
+            message = "ဆိုင်းငံ့ထားသော အော်ဒါ [${order.label}] (${order.itemCount} မျိုး, %,d Ks) ကို ဖျက်ပစ်ရန် သေချာပါသလား?".format(order.totalMinor),
+            confirmText = "ဖျက်မည်",
+            cancelText = "မလုပ်တော့ပါ",
+            onConfirm = {
+                viewModel.deleteParkedOrder(order.parkId)
+                orderToDelete = null
+            },
+            onDismiss = { orderToDelete = null }
+        )
     }
 }

@@ -56,12 +56,15 @@ fun ProductDetailsDialog(
     onAddToCart: (() -> Unit)? = null,
     onAdjustStock: ((Long) -> Unit)? = null,
     onUpdateProduct: ((ProductEntity) -> Unit)? = null,
+    onSaveImage: ((android.net.Uri) -> String?)? = null,
 ) {
     var isEditing by remember { mutableStateOf(false) }
     var editName by remember(product) { mutableStateOf(product.name) }
     var editSku by remember(product) { mutableStateOf(product.sku) }
     var editBarcode by remember(product) { mutableStateOf(product.barcode ?: "") }
     var editCategory by remember(product) { mutableStateOf(product.category) }
+    var editUnitName by remember(product) { mutableStateOf(product.unitName) }
+    var editImageUri by remember(product) { mutableStateOf(product.imageUri) }
     var editSellPrice by remember(product) { mutableStateOf(product.sellPriceMinor.toString()) }
     var editCostPrice by remember(product) { mutableStateOf(product.costPriceMinor.toString()) }
     var editStock by remember(product) { mutableStateOf(product.stockQuantity.toString()) }
@@ -123,6 +126,14 @@ fun ProductDetailsDialog(
 
                 if (isEditing) {
                     // Edit Form
+                    // Camera and Gallery Image Picker
+                    ProductImagePicker(
+                        imagePath = editImageUri,
+                        onImageSelected = { editImageUri = it },
+                        onSaveGalleryUri = { uri -> onSaveImage?.invoke(uri) },
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
+
                     OutlinedTextField(
                         value = editName,
                         onValueChange = { editName = it },
@@ -155,6 +166,32 @@ fun ProductDetailsDialog(
                         label = { Text("အမျိုးအစား စာသား") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth().testTag("edit_product_category_input"),
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Unit selector & custom unit input
+                    Text("ယူနစ် သတ်မှတ်ရန် (Unit) *", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                    val commonUnits = listOf("ခု", "အိတ်", "ပိဿာ", "ဗူး", "ချပ်", "လိပ်", "တန်", "ထုပ်", "စုံ", "ပေ", "ကီလို")
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    ) {
+                        items(commonUnits) { u ->
+                            FilterChip(
+                                selected = editUnitName == u,
+                                onClick = { editUnitName = u },
+                                label = { Text(u, fontSize = 11.sp) },
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = editUnitName,
+                        onValueChange = { editUnitName = it },
+                        label = { Text("ယူနစ် စာသား (ဥပမာ - အိတ်၊ ပိဿာ၊ ဗူး၊ ခု)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("edit_product_unit_input"),
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -251,6 +288,8 @@ fun ProductDetailsDialog(
                                     sku = editSku.trim(),
                                     barcode = if (editBarcode.isNotBlank()) editBarcode.trim() else null,
                                     category = editCategory.trim(),
+                                    unitName = editUnitName.trim().ifBlank { "ခု" },
+                                    imageUri = editImageUri,
                                     sellPriceMinor = sellP,
                                     costPriceMinor = costP,
                                     stockQuantity = stockQ,
@@ -348,8 +387,9 @@ fun ProductDetailsDialog(
                             "%,d Ks (%.1f%%)".format(profitMinor, marginPercent)
                         )
                         DetailItem("အမျိုးအစားပုံစံ", if (product.isRoofingSheet) "သွပ်ပြား (ပေအရှည်တွက်ချက်သည်)" else "သာမန်ပစ္စည်း")
-                        DetailItem("လက်ရှိ လက်ကျန်", "${product.stockQuantity} ${if (product.isRoofingSheet) "ချပ်" else "ခု/အိတ်"}")
-                        DetailItem("သတိပေး လက်ကျန်", "${product.lowStockThreshold} ${if (product.isRoofingSheet) "ချပ်" else "ခု/အိတ်"}")
+                        DetailItem("ယူနစ်", product.unitName)
+                        DetailItem("လက်ရှိ လက်ကျန်", "${product.stockQuantity} ${product.unitName}")
+                        DetailItem("သတိပေး လက်ကျန်", "${product.lowStockThreshold} ${product.unitName}")
                     }
                 }
 

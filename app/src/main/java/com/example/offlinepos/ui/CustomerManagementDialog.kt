@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Search
@@ -559,6 +560,7 @@ private fun CustomerLedgerDetailsDialog(
 ) {
     val context = LocalContext.current
     val transactions by viewModel.getCustomerTransactions(customer.customerId).collectAsState(initial = emptyList())
+    var showDeleteCustomerConfirm by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -597,27 +599,36 @@ private fun CustomerLedgerDetailsDialog(
                         }
                     }
 
-                    // Share Debt Voucher
-                    IconButton(
-                        onClick = {
-                            val shareText = """
-                                📄 **အကြွေးကျန်ငွေ သတိပေးလွှာ ($storeName)**
-                                • ဝယ်သူအမည်: ${customer.name}
-                                • ဖုန်း: ${customer.phone}
-                                • လက်ရှိ ပေးရန်ကျန်ငွေ: %,d Ks
-                                
-                                ဝယ်ယူအားပေးမှုကို အထူးပင် ကျေးဇူးတင်ရှိပါသည်။
-                            """.trimIndent().format(customer.currentDebtMinor)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Share Debt Voucher
+                        IconButton(
+                            onClick = {
+                                val shareText = """
+                                    📄 **အကြွေးကျန်ငွေ သတိပေးလွှာ ($storeName)**
+                                    • ဝယ်သူအမည်: ${customer.name}
+                                    • ဖုန်း: ${customer.phone}
+                                    • လက်ရှိ ပေးရန်ကျန်ငွေ: %,d Ks
+                                    
+                                    ဝယ်ယူအားပေးမှုကို အထူးပင် ကျေးဇူးတင်ရှိပါသည်။
+                                """.trimIndent().format(customer.currentDebtMinor)
 
-                            val sendIntent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, shareText)
-                                type = "text/plain"
+                                val sendIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, shareText)
+                                    type = "text/plain"
+                                }
+                                context.startActivity(Intent.createChooser(sendIntent, "အကြွေးသတိပေးလွှာ မျှဝေမည်"))
                             }
-                            context.startActivity(Intent.createChooser(sendIntent, "အကြွေးသတိပေးလွှာ မျှဝေမည်"))
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.primary)
                         }
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.primary)
+
+                        // Delete Customer with confirmation
+                        IconButton(
+                            onClick = { showDeleteCustomerConfirm = true }
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete Customer", tint = Color(0xFFDC2626))
+                        }
                     }
                 }
 
@@ -733,5 +744,24 @@ private fun CustomerLedgerDetailsDialog(
                 }
             }
         }
+    }
+
+    if (showDeleteCustomerConfirm) {
+        ConfirmDeleteDialog(
+            title = "🗑️ ဝယ်သူ အချက်အလက် ဖျက်မည်",
+            message = "ဝယ်သူ [${customer.name}] ကို စာရင်းမှ ဖျက်ပစ်ရန် သေချာပါသလား? ဤလုပ်ဆောင်ချက်ကို ပြန်ပြင်၍ မရနိုင်ပါ။",
+            confirmText = "ဖျက်မည်",
+            cancelText = "မလုပ်တော့ပါ",
+            onConfirm = {
+                viewModel.deleteCustomer(customer.customerId) { success, msg ->
+                    viewModel.setBanner(msg)
+                    if (success) {
+                        showDeleteCustomerConfirm = false
+                        onDismiss()
+                    }
+                }
+            },
+            onDismiss = { showDeleteCustomerConfirm = false }
+        )
     }
 }

@@ -56,11 +56,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.ui.layout.ContentScale
@@ -97,6 +99,8 @@ fun HomeScreen(
     var showShiftReport by remember { mutableStateOf(false) }
     var showServerDialog by remember { mutableStateOf(false) }
     val isServerRunning by viewModel.isServerRunning.collectAsState()
+    val context = LocalContext.current
+    var recentSearches by remember { mutableStateOf(RecentSearchHelper.getRecentSearches(context)) }
 
     val totalItemCount = cart.sumOf { it.quantity }
 
@@ -227,7 +231,12 @@ fun HomeScreen(
             ) {
                 OutlinedTextField(
                     value = searchQuery,
-                    onValueChange = { viewModel.setSearchQuery(it) },
+                    onValueChange = {
+                        viewModel.setSearchQuery(it)
+                        if (it.trim().length >= 2) {
+                            recentSearches = RecentSearchHelper.addSearchTerm(context, it)
+                        }
+                    },
                     placeholder = { Text("Name or SKU") },
                     leadingIcon = {
                         Icon(Icons.Default.Search, contentDescription = "Search")
@@ -249,6 +258,53 @@ fun HomeScreen(
                         unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                     )
                 )
+
+                // Recent Searches Feature (Stores the last 5 search terms locally)
+                if (recentSearches.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp)
+                    ) {
+                        Text(
+                            text = "🕒 ရှာဖွေမှုများ:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            items(recentSearches) { term ->
+                                SuggestionChip(
+                                    onClick = {
+                                        viewModel.setSearchQuery(term)
+                                        recentSearches = RecentSearchHelper.addSearchTerm(context, term)
+                                    },
+                                    label = { Text(term, fontSize = 11.sp) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.testTag("recent_search_chip_$term")
+                                )
+                            }
+                        }
+                        IconButton(
+                            onClick = {
+                                RecentSearchHelper.clearSearches(context)
+                                recentSearches = emptyList()
+                            },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Clear recent searches",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
 

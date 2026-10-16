@@ -10,6 +10,7 @@ data class ProductDraft(
     val isRoofingSheet: Boolean = false,
     val lowStockThreshold: Long = 3,
     val imageUri: String? = null,
+    val unitName: String = "ခု",
 ) {
     fun validate(): List<String> = buildList {
         if (name.isBlank()) add("ကုန်ပစ္စည်း အမည် ထည့်ရန် လိုအပ်ပါသည်")

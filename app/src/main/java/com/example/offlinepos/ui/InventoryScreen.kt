@@ -84,9 +84,12 @@ fun InventoryScreen(
     val products by viewModel.allProducts.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val storeProfile by viewModel.storeProfile.collectAsState()
+    val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategoryFilter by remember { mutableStateOf("အားလုံး") }
     var showAddDialog by remember { mutableStateOf(false) }
+    var productToDelete by remember { mutableStateOf<ProductEntity?>(null) }
+    var recentSearches by remember { mutableStateOf(RecentSearchHelper.getRecentSearches(context)) }
 
     val filteredList = products.filter {
         val matchesSearch = searchQuery.isBlank() || it.name.contains(searchQuery, ignoreCase = true) || it.sku.contains(searchQuery, ignoreCase = true)
@@ -135,15 +138,73 @@ fun InventoryScreen(
             // Search field
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = { searchQuery = it },
+                onValueChange = {
+                    searchQuery = it
+                    if (it.trim().length >= 2) {
+                        recentSearches = RecentSearchHelper.addSearchTerm(context, it)
+                    }
+                },
                 placeholder = { Text("Name or SKU") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(androidx.compose.material.icons.Icons.Default.Close, contentDescription = "Clear")
+                        }
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("inventory_search_field"),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
             )
+
+            // Recent Searches Chips (stores last 5 search terms locally)
+            if (recentSearches.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp)
+                ) {
+                    Text(
+                        text = "🕒 ရှာဖွေမှုများ:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        items(recentSearches) { term ->
+                            androidx.compose.material3.SuggestionChip(
+                                onClick = {
+                                    searchQuery = term
+                                    recentSearches = RecentSearchHelper.addSearchTerm(context, term)
+                                },
+                                label = { Text(term, fontSize = 11.sp) },
+                                shape = RoundedCornerShape(8.dp),
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = {
+                            RecentSearchHelper.clearSearches(context)
+                            recentSearches = emptyList()
+                        },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            androidx.compose.material.icons.Icons.Default.Close,
+                            contentDescription = "Clear recent searches",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -214,11 +275,26 @@ fun InventoryScreen(
                         product = product,
                         onDoubleTap = { viewModel.openProductDetails(product) },
                         onAdjustStock = { qty -> viewModel.adjustStock(product.productId, qty) },
-                        onArchive = { viewModel.archiveProduct(product.productId) },
+                        onArchive = { productToDelete = product },
                     )
                 }
             }
         }
+    }
+
+    // Confirm Delete Dialog for Products
+    productToDelete?.let { prod ->
+        ConfirmDeleteDialog(
+            title = "🗑️ ကုန်ပစ္စည်း ဖျက်ရန် အတည်ပြုပါ",
+            message = "ကုန်ပစ္စည်း [${prod.name}] ကို စာရင်းမှ ဖျက်ပစ်ရန် သေချာပါသလား? ဤလုပ်ဆောင်ချက်ကို ပြန်ပြင်၍ မရနိုင်ပါ။",
+            confirmText = "ဖျက်မည်",
+            cancelText = "မလုပ်တော့ပါ",
+            onConfirm = {
+                viewModel.archiveProduct(prod.productId)
+                productToDelete = null
+            },
+            onDismiss = { productToDelete = null }
+        )
     }
 
     if (showAddDialog) {
@@ -326,7 +402,7 @@ private fun InventoryItemCard(
                         color = if (isLowStock) Color(0xFFFEF2F2) else Color(0xFFDCFCE7),
                     ) {
                         Text(
-                            text = "${product.stockQuantity} ${if (product.isRoofingSheet) "ချပ်" else "ခု"}${if (isLowStock) " (⚠️သတိပေး)" else ""}",
+                            text = "${product.stockQuantity} ${product.unitName}${if (isLowStock) " (⚠️သတိပေး)" else ""}",
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
                             color = if (isLowStock) Color(0xFFDC2626) else Color(0xFF15803D),
@@ -379,19 +455,10 @@ private fun AddProductDialog(
     var lowStockThreshold by remember { mutableStateOf("3") }
     var selectedCategory by remember { mutableStateOf(if (categories.isNotEmpty()) categories.first() else "ဘိလပ်မြေ") }
     var newCategoryInput by remember { mutableStateOf("") }
+    var unitName by remember { mutableStateOf("ခု") }
     var isRoofingSheet by remember { mutableStateOf(false) }
     var pickedImageUri by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    // Android Zero-permission Photo Picker
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            val savedPath = onSaveImage(uri)
-            pickedImageUri = savedPath
-        }
-    }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -415,63 +482,15 @@ private fun AddProductDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Custom Image from Phone Gallery
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (pickedImageUri != null) {
-                        Surface(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                        ) {
-                            val bitmap = remember(pickedImageUri) {
-                                android.graphics.BitmapFactory.decodeFile(pickedImageUri)
-                            }
-                            if (bitmap != null) {
-                                Image(
-                                    bitmap = bitmap.asImageBitmap(),
-                                    contentDescription = "Picked Image",
-                                    contentScale = ContentScale.Crop,
-                                )
-                            }
-                        }
-                    } else {
-                        Surface(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("📷", fontSize = 24.sp)
-                            }
-                        }
-                    }
+                // Camera and Gallery Image Picker
+                ProductImagePicker(
+                    imagePath = pickedImageUri,
+                    onImageSelected = { pickedImageUri = it },
+                    onSaveGalleryUri = onSaveImage,
+                    modifier = Modifier.padding(bottom = 10.dp),
+                )
 
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column {
-                        OutlinedButton(
-                            onClick = {
-                                photoPickerLauncher.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                )
-                            },
-                            modifier = Modifier.testTag("pick_gallery_image_button"),
-                        ) {
-                            Text(if (pickedImageUri != null) "ပုံ ပြောင်းမည်" else "📱 ဖုန်း Gallery မှ ပုံရွေးမည်", fontSize = 12.sp)
-                        }
-                        if (pickedImageUri != null) {
-                            TextButton(onClick = { pickedImageUri = null }) {
-                                Text("ပုံ ပြန်ဖျက်မည်", color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // Category Grouping
                 Text("အမျိုးအစား အုပ်စု (Category Group) *", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
@@ -517,7 +536,10 @@ private fun AddProductDialog(
                 ) {
                     Checkbox(
                         checked = isRoofingSheet,
-                        onCheckedChange = { isRoofingSheet = it },
+                        onCheckedChange = {
+                            isRoofingSheet = it
+                            if (it) unitName = "ချပ်"
+                        },
                         modifier = Modifier.testTag("roofing_checkbox"),
                     )
                     Spacer(modifier = Modifier.width(4.dp))
@@ -526,6 +548,32 @@ private fun AddProductDialog(
                         Text("တစ်ပေ စျေးနှုန်းဖြင့် ပေအရှည် x ချပ်ရေ တွက်ချက်မည်", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Custom Unit Selection & Input
+                Text("ယူနစ် သတ်မှတ်ရန် (Unit) *", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                val commonUnits = listOf("ခု", "အိတ်", "ပိဿာ", "ဗူး", "ချပ်", "လိပ်", "တန်", "ထုပ်", "စုံ", "ပေ", "ကီလို")
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                ) {
+                    items(commonUnits) { u ->
+                        FilterChip(
+                            selected = unitName == u,
+                            onClick = { unitName = u },
+                            label = { Text(u, fontSize = 11.sp) },
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = unitName,
+                    onValueChange = { unitName = it },
+                    label = { Text("ယူနစ် စာသား (ဥပမာ - အိတ်၊ ပိဿာ၊ ဗူး၊ ခု)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("product_unit_input"),
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -584,7 +632,7 @@ private fun AddProductDialog(
                     OutlinedTextField(
                         value = stock,
                         onValueChange = { stock = it.filter { ch -> ch.isDigit() } },
-                        label = { Text(if (isRoofingSheet) "လက်ကျန် (ချပ်ရေ)" else "လက်ကျန် အရေအတွက်") },
+                        label = { Text(if (isRoofingSheet) "လက်ကျန် (ချပ်ရေ)" else "လက်ကျန် (${unitName.ifBlank { "ခု" }})") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f).testTag("product_stock_input"),
@@ -592,7 +640,7 @@ private fun AddProductDialog(
                     OutlinedTextField(
                         value = lowStockThreshold,
                         onValueChange = { lowStockThreshold = it.filter { ch -> ch.isDigit() } },
-                        label = { Text("သတိပေး လက်ကျန် (ခု/ချပ်)") },
+                        label = { Text("သတိပေး လက်ကျန် (${unitName.ifBlank { "ခု" }})") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f).testTag("product_low_stock_input"),
@@ -633,6 +681,7 @@ private fun AddProductDialog(
                                 isRoofingSheet = isRoofingSheet,
                                 lowStockThreshold = lowStock,
                                 imageUri = pickedImageUri,
+                                unitName = unitName.trim().ifBlank { "ခု" },
                             )
                             val errors = draft.validate()
                             if (errors.isNotEmpty()) {

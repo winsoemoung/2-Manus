@@ -36,6 +36,7 @@ data class RemoteProductDto(
     val lowStockThreshold: Long,
     val unitName: String = "ခု",
     val staffName: String = "ဆိုင်ဝန်ထမ်း",
+    val imageUri: String? = null,
 )
 
 data class ReceivedProductLog(
@@ -212,7 +213,7 @@ class LocalPosServer(
                     val products = onGetProducts()
                     val json = JSONObject().apply {
                         put("status", "online")
-                        put("serverName", "15C_787_AI_SERVER")
+                        put("serverName", "16A_787_AI_SERVER")
                         put("storeName", getStoreName())
                         put("productCount", products.size)
                         put("timestamp", System.currentTimeMillis())
@@ -312,6 +313,23 @@ class LocalPosServer(
         }
     }
 
+    private fun saveBase64Image(rawBase64: String?): String? {
+        if (rawBase64.isNullOrBlank()) return null
+        return try {
+            val pureBase64 = if (rawBase64.contains(",")) rawBase64.substringAfter(",") else rawBase64
+            val bytes = android.util.Base64.decode(pureBase64, android.util.Base64.DEFAULT)
+            val imageDir = File(context.filesDir, "product_images").apply { mkdirs() }
+            val destFile = File(imageDir, "prod_web_${System.currentTimeMillis()}.jpg")
+            FileOutputStream(destFile).use { fos ->
+                fos.write(bytes)
+            }
+            destFile.absolutePath
+        } catch (e: Exception) {
+            android.util.Log.e("LocalPosServer", "Error saving base64 image: ${e.message}")
+            null
+        }
+    }
+
     private fun parseProductPayload(body: String): RemoteProductDto {
         val trimmed = body.trim()
         return if (trimmed.startsWith("{")) {
@@ -326,6 +344,8 @@ class LocalPosServer(
             val threshold = if (json.has("lowStockThreshold")) json.optLong("lowStockThreshold", 3L) else json.optLong("threshold", 3L)
             val unit = json.optString("unitName", json.optString("unit", "ခု")).trim().ifBlank { "ခု" }
             val staff = json.optString("staffName", json.optString("staff", "ဆိုင်ဝန်ထမ်း")).trim().ifBlank { "ဆိုင်ဝန်ထမ်း" }
+            val imageBase64 = json.optString("imageBase64", "").trim().takeIf { it.isNotBlank() }
+            val savedImagePath = saveBase64Image(imageBase64)
 
             RemoteProductDto(
                 name = name,
@@ -337,7 +357,8 @@ class LocalPosServer(
                 stockQuantity = stock,
                 lowStockThreshold = threshold,
                 unitName = unit,
-                staffName = staff
+                staffName = staff,
+                imageUri = savedImagePath,
             )
         } else {
             val params = mutableMapOf<String, String>()
@@ -359,6 +380,8 @@ class LocalPosServer(
             val threshold = (params["lowStockThreshold"] ?: params["threshold"] ?: "3").toLongOrNull() ?: 3L
             val unit = (params["unitName"] ?: params["unit"] ?: "ခု").trim().ifBlank { "ခု" }
             val staff = (params["staffName"] ?: params["staff"] ?: "ဆိုင်ဝန်ထမ်း").trim().ifBlank { "ဆိုင်ဝန်ထမ်း" }
+            val imageBase64 = (params["imageBase64"] ?: "").trim().takeIf { it.isNotBlank() }
+            val savedImagePath = saveBase64Image(imageBase64)
 
             RemoteProductDto(
                 name = name,
@@ -370,7 +393,8 @@ class LocalPosServer(
                 stockQuantity = stock,
                 lowStockThreshold = threshold,
                 unitName = unit,
-                staffName = staff
+                staffName = staff,
+                imageUri = savedImagePath,
             )
         }
     }
@@ -489,13 +513,20 @@ class LocalPosServer(
         #scannerVideo { width: 100%; height: 220px; object-fit: cover; }
         .scanner-overlay { position: absolute; inset: 20% 15%; border: 2px dashed #22c55e; border-radius: 8px; pointer-events: none; }
         .scanner-close { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+        .photo-picker-box { border: 1.5px dashed var(--border); border-radius: 10px; padding: 12px; margin-bottom: 12px; background: #fafafa; }
+        .photo-picker-btns { display: flex; gap: 8px; margin-top: 6px; }
+        .btn-photo { flex: 1; min-height: 40px; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; }
+        .btn-photo:hover { background: #e2e8f0; color: #0f172a; }
+        .img-preview-box { display: none; align-items: center; gap: 10px; margin-top: 8px; background: white; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); }
+        .img-preview { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; border: 1px solid #cbd5e1; }
+        .btn-remove-img { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; padding: 4px 8px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>📱 $store</h1>
-        <p>Direct HTML5 Web Portal (15C_787_AI)</p>
-        <span class="status-badge" id="serverStatusBadge">🟢 15C Main Server ချိတ်ဆက်ပြီး</span>
+        <p>Direct HTML5 Web Portal (16A_787_AI)</p>
+        <span class="status-badge" id="serverStatusBadge">🟢 16A Main Server ချိတ်ဆက်ပြီး</span>
         <div class="net-status-bar">
             <span class="net-status-item"><span class="dot dot-green"></span> Server: Reachable</span>
             <span class="net-status-item"><span class="dot dot-blue"></span> DB: Synced</span>
@@ -586,6 +617,31 @@ class LocalPosServer(
                 <div class="form-group">
                     <label>⚠️ သတိပေး လက်ကျန်</label>
                     <input type="number" id="lowStockThreshold" value="3" placeholder="3">
+                </div>
+            </div>
+
+            <!-- Product Photo (Camera & Gallery) -->
+            <div class="photo-picker-box">
+                <label>📷 ကုန်ပစ္စည်း ဓါတ်ပုံ (Camera & Gallery)</label>
+                <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" onchange="handleImageSelected(this)">
+                <input type="file" id="galleryInput" accept="image/*" style="display:none;" onchange="handleImageSelected(this)">
+                
+                <div class="photo-picker-btns">
+                    <button type="button" class="btn-photo" onclick="document.getElementById('cameraInput').click()">
+                        📷 ကင်မရာဖြင့် ဓါတ်ပုံရိုက်မည်
+                    </button>
+                    <button type="button" class="btn-photo" onclick="document.getElementById('galleryInput').click()">
+                        🖼️ Gallery မှ ပုံရွေးမည်
+                    </button>
+                </div>
+
+                <div class="img-preview-box" id="imgPreviewBox">
+                    <img id="imgPreview" class="img-preview" alt="Preview">
+                    <div style="flex:1;">
+                        <span style="font-size:12px; font-weight:600; color:var(--text);" id="imgPreviewName">ပုံ ရွေးချယ်ပြီးပါပြီ</span><br>
+                        <span style="font-size:11px; color:var(--text-muted);">ဆာဗာသို့ အလိုအလျောက် သိမ်းဆည်းပေးမည်</span>
+                    </div>
+                    <button type="button" class="btn-remove-img" onclick="removeImage()">✕ ဖြုတ်မည်</button>
                 </div>
             </div>
 
@@ -736,6 +792,28 @@ class LocalPosServer(
             document.getElementById('scannerBox').style.display = 'none';
         }
 
+        let selectedImageDataUrl = null;
+
+        function handleImageSelected(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    selectedImageDataUrl = e.target.result;
+                    document.getElementById('imgPreview').src = selectedImageDataUrl;
+                    document.getElementById('imgPreviewBox').style.display = 'flex';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function removeImage() {
+            selectedImageDataUrl = null;
+            document.getElementById('cameraInput').value = '';
+            document.getElementById('galleryInput').value = '';
+            document.getElementById('imgPreviewBox').style.display = 'none';
+        }
+
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
             alertSuccess.style.display = 'none';
@@ -755,7 +833,8 @@ class LocalPosServer(
                 sellPriceMinor: parseInt(document.getElementById('sellPrice').value) || 0,
                 costPriceMinor: parseInt(document.getElementById('costPrice').value) || 0,
                 stockQuantity: parseInt(document.getElementById('stockQuantity').value) || 0,
-                lowStockThreshold: parseInt(document.getElementById('lowStockThreshold').value) || 3
+                lowStockThreshold: parseInt(document.getElementById('lowStockThreshold').value) || 3,
+                imageBase64: selectedImageDataUrl || ''
             };
 
             try {
@@ -787,6 +866,7 @@ class LocalPosServer(
                     document.getElementById('sellPrice').value = '';
                     document.getElementById('costPrice').value = '0';
                     document.getElementById('stockQuantity').value = '10';
+                    removeImage();
                     document.getElementById('productName').focus();
                 } else {
                     alertError.innerText = '❌ ' + (data.message || 'ထည့်သွင်းခြင်း မအောင်မြင်ပါ');
