@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun MainApp(viewModel: PosViewModel) {
     val isStaffClientMode by viewModel.isStaffClientMode.collectAsState()

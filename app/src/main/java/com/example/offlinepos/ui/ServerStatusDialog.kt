@@ -125,7 +125,7 @@ fun ServerStatusDialog(
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text("🌐 15B Main POS Server", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text("🌐 15C Main POS Server", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                             Text(
                                 text = if (isRunning) "🟢 ဆာဗာ အွန်လိုင်း (Online - Direct Web Portal)" else "🔴 ဆာဗာ ရပ်တန့်ထားသည်",
                                 fontSize = 11.5.sp,

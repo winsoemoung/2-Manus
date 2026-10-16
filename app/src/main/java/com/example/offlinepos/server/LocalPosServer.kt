@@ -212,7 +212,7 @@ class LocalPosServer(
                     val products = onGetProducts()
                     val json = JSONObject().apply {
                         put("status", "online")
-                        put("serverName", "15B_787_AI_SERVER")
+                        put("serverName", "15C_787_AI_SERVER")
                         put("storeName", getStoreName())
                         put("productCount", products.size)
                         put("timestamp", System.currentTimeMillis())
@@ -437,7 +437,7 @@ class LocalPosServer(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>787 ဆိုင်ဝန်ထမ်း Web Portal (15B)</title>
+    <title>787 ဆိုင်ဝန်ထမ်း Web Portal (15C)</title>
     <style>
         :root {
             --primary: #0284c7;
@@ -494,8 +494,8 @@ class LocalPosServer(
 <body>
     <div class="header">
         <h1>📱 $store</h1>
-        <p>Direct HTML5 Web Portal (15B_787_AI)</p>
-        <span class="status-badge" id="serverStatusBadge">🟢 15B Main Server ချိတ်ဆက်ပြီး</span>
+        <p>Direct HTML5 Web Portal (15C_787_AI)</p>
+        <span class="status-badge" id="serverStatusBadge">🟢 15C Main Server ချိတ်ဆက်ပြီး</span>
         <div class="net-status-bar">
             <span class="net-status-item"><span class="dot dot-green"></span> Server: Reachable</span>
             <span class="net-status-item"><span class="dot dot-blue"></span> DB: Synced</span>
